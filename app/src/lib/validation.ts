@@ -123,3 +123,34 @@ export const TIPOS_REGISTRO_EMERGENCIA = [
   "varadura",
   "remolque",
 ] as const;
+
+// ---------------------------------------------------------------------------
+// RE-01 F — Control del bote de rescate (checklist) — sección 5.5
+// ---------------------------------------------------------------------------
+
+export const TIPOS_CHECKLIST_BOTE = [
+  "bote_exterior",
+  "bote_interior",
+  "bote_pescante",
+  "bote_inventario",
+] as const;
+
+const itemChecklistSchema = z.object({
+  checklistConfigId: z.string().min(1),
+  estado: z.enum(["OK", "NO_OK"]),
+  observacion: z.string().optional().nullable(),
+});
+
+export const crearBoteRescateSchema = z.object({
+  marea: z.string().optional().nullable(),
+  singladura: z.string().optional().nullable(),
+  fechaHora: z.coerce.date(),
+  ubicacionPosicion: z.string().optional().nullable(),
+  observaciones: z.string().optional().nullable(),
+  items: z.array(itemChecklistSchema).min(1, "El checklist no puede estar vacío"),
+  // Confirmación por PIN (especificación, sección 4) en lugar de firma manuscrita.
+  confirmadoPorId: z.string().min(1, "Indicá quién confirma el checklist"),
+  pin: z.string().min(1, "Ingresá el PIN de confirmación"),
+});
+
+export const editarBoteRescateSchema = crearBoteRescateSchema;

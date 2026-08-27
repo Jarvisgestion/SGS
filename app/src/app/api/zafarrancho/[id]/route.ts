@@ -13,7 +13,12 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
     where: { id },
     include: {
       tipoZafarrancho: true,
-      participantes: { include: { tripulante: true } },
+      // `select` explícito: `tripulante: true` traería también `pinHash`.
+      participantes: {
+        include: {
+          tripulante: { select: { id: true, apellidoNombre: true, dni: true, puesto: true } },
+        },
+      },
       revisiones: { orderBy: { revisadoAt: "desc" } },
     },
   });

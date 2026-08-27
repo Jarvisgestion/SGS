@@ -49,11 +49,17 @@ model Tripulante {
   dni            String
   puesto         String
   activo         Boolean  @default(true)
+  /// Hash scrypt del PIN de confirmación (ver `src/lib/pin.ts`). Habilita la
+  /// "confirmación por PIN" que la especificación (sección 4) pide para los
+  /// checklists rutinarios como RE-01 F, en vez de la firma manuscrita.
+  /// Nullable: un tripulante sin PIN asignado no puede confirmar checklists.
+  pinHash        String?  @map("pin_hash")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  buque           Buque                     @relation(fields: [buqueId], references: [id])
-  participaciones ZafarranchoParticipante[]
+  buque                   Buque                     @relation(fields: [buqueId], references: [id])
+  participaciones         ZafarranchoParticipante[]
+  botesRescateConfirmados BoteRescateControl[]
 
   @@unique([buqueId, dni])
   @@map("tripulante")
@@ -309,22 +315,44 @@ model RegistroEmergenciaRevision {
 // ---------------------------------------------------------------------------
 
 model BoteRescateControl {
-  id                String   @id @default(cuid())
-  buqueId           String   @map("buque_id")
+  id                String    @id @default(cuid())
+  buqueId           String    @map("buque_id")
   marea             String?
   singladura        String?
-  fechaHora         DateTime @map("fecha_hora")
-  ubicacionPosicion String?  @map("ubicacion_posicion")
+  fechaHora         DateTime  @map("fecha_hora")
+  ubicacionPosicion String?   @map("ubicacion_posicion")
   observaciones     String?
   firma             String?
-  estado            String   @default("borrador")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  /// Quién confirmó el checklist con su PIN (sección 4 de la especificación:
+  /// los checklists rutinarios se confirman por PIN, no con firma manuscrita).
+  /// El PIN se valida contra `Tripulante.pinHash` y nunca se persiste.
+  confirmadoPorId   String?   @map("confirmado_por_id")
+  confirmadoAt      DateTime? @map("confirmado_at")
+  estado            String    @default("borrador")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  submittedAt       DateTime? @map("submitted_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
-  buque              Buque               @relation(fields: [buqueId], references: [id])
+  buque              Buque                        @relation(fields: [buqueId], references: [id])
+  confirmadoPor      Tripulante?                  @relation(fields: [confirmadoPorId], references: [id])
   checklistRegistros ChecklistRegistro[]
+  revisiones         BoteRescateControlRevision[]
 
   @@map("bote_rescate_control")
+}
+
+/// Mismo motivo que `ZafarranchoRevision`: historial de revisión en tierra.
+model BoteRescateControlRevision {
+  id          String   @id @default(cuid())
+  controlId   String   @map("control_id")
+  decision    String // aprobado | observado
+  comentario  String?
+  revisadoPor String   @map("revisado_por")
+  revisadoAt  DateTime @default(now()) @map("revisado_at")
+
+  control BoteRescateControl @relation(fields: [controlId], references: [id], onDelete: Cascade)
+
+  @@map("bote_rescate_control_revision")
 }
 
 /// `registroPadreTipo`/`registroPadreId` quedan documentados para cuando se

@@ -11,6 +11,11 @@ const REGISTROS = [
     bordo: "/bordo/emergencia",
     tierra: "/tierra/emergencia",
   },
+  {
+    nombre: "RE-01 F — Control del bote de rescate",
+    bordo: "/bordo/bote-rescate",
+    tierra: "/tierra/bote-rescate",
+  },
 ];
 
 export default function Home() {

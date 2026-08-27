@@ -42,9 +42,13 @@ npm run db:seed       # carga el buque Pesantar 1, tripulación demo y catálogo
 npm run dev
 ```
 
-Abrí:
-- [http://localhost:3000/bordo/zafarrancho](http://localhost:3000/bordo/zafarrancho) — carga a bordo
-- [http://localhost:3000/tierra/zafarrancho](http://localhost:3000/tierra/zafarrancho) — revisión en tierra
+Abrí [http://localhost:3000](http://localhost:3000) y elegí el registro y la
+vista (a bordo / tierra) desde el índice.
+
+**PIN de demo** para confirmar el control del bote de rescate (RE-01 F):
+Fernández `1234`, Gómez `2345`, Pérez `3456`, Suárez `4567`. Están en
+`prisma/seed.ts` y son sólo para el piloto local — en un entorno real hay que
+asignar PIN por tripulante y no sembrar ninguno.
 
 Otros comandos útiles:
 
@@ -78,29 +82,56 @@ npm run build
   corresponde. El tipo no se puede cambiar al corregir un registro ya
   cargado, para no dejar huérfanos los datos de la extensión anterior.
 
-Ambos flujos están verificados de punta a punta en navegador: alta con
-firma → revisión en tierra → observación con comentario → corrección a
-bordo → aprobación, con el historial de revisiones completo.
+- **API + UI de punta a punta para RE-01 F** (control del bote de rescate),
+  bajo `/api/bote-rescate`. Es el primer registro tipo *checklist*: los
+  ítems salen de `checklist_config` (catálogo editable por buque, agrupado
+  en inspección exterior / interior / pescante / inventario), se marcan
+  OK / No OK con observación por ítem, y tierra ve los no conformes
+  destacados.
+  A diferencia de los anteriores, **se confirma por PIN y no con firma
+  manuscrita**, como pide la sección 4 de la especificación para los
+  checklists rutinarios. El PIN se valida contra `Tripulante.pinHash`
+  (scrypt, ver `src/lib/pin.ts`) y nunca se persiste ni viaja de vuelta al
+  navegador. Corregir un control observado exige volver a confirmarlo con
+  PIN: es un acto nuevo, no un arrastre del anterior.
+
+Los tres flujos están verificados de punta a punta en navegador: carga →
+revisión en tierra → observación con comentario → corrección a bordo →
+aprobación, con el historial de revisiones completo.
+
+### Sobre el PIN — alcance y límites
+
+`src/lib/pin.ts` cubre la *confirmación de un checklist*, **no** es un
+sistema de autenticación: no hay sesión, ni bloqueo por reintentos, ni
+rotación de PIN. Un PIN de 4 dígitos se rompe por fuerza bruta en segundos
+si el endpoint queda expuesto sin rate limit. Antes de exponer esto fuera
+de una red controlada hace falta el login real (próximo paso 2).
 
 ### Decisión de diseño no explícita en la especificación
 
 La especificación (sección 5.3) no define una tabla de revisión para
-`zafarrancho_ejercicio`. Se agregó `zafarrancho_revision` (y su equivalente
-`registro_emergencia_revision` para B/C/D/E/R) porque, sin ella, cada nueva
-revisión pisaría el comentario/decisión anterior — y la sección 2.5 exige
-trazabilidad completa de "el historial de idas y vueltas si hubo
-observaciones". Queda documentado en `prisma/schema.prisma`.
+`zafarrancho_ejercicio`. Se agregó `zafarrancho_revision` (y sus equivalentes
+`registro_emergencia_revision` y `bote_rescate_control_revision`) porque, sin
+ella, cada nueva revisión pisaría el comentario/decisión anterior — y la
+sección 2.5 exige trazabilidad completa de "el historial de idas y vueltas si
+hubo observaciones". Queda documentado en `prisma/schema.prisma`.
+
+## Decisiones abiertas (para definir con el usuario)
+
+- **¿Un ítem marcado "No OK" debería exigir observación?** Hoy es opcional:
+  se puede enviar un control con un ítem no conforme sin explicar por qué,
+  y tierra lo ve en rojo pero sin detalle. Se dejó opcional porque la
+  especificación no lo pide, pero es una decisión de negocio a confirmar.
 
 ## Próximos pasos sugeridos
 
-1. **Completar PE-01 con los checklists** (RE-01 F — bote de rescate — y
-   PM-04 Anexo A/B), reutilizando el mismo patrón de API + UI. El schema
-   (`bote_rescate_control`, `checklist_registro`, `checklist_config`) ya está
-   modelado y el catálogo de ítems del Anexo A ya viene en el seed.
-   Nota: `checklist_registro` tiene hoy un `registroPadreTipo` /
-   `registroPadreId` genérico previendo los padres de PM-04, que todavía no
-   tienen tabla de cabecera propia definida en la especificación — conviene
-   resolver eso al encarar este paso.
+1. **PM-04 Anexo A/B** (los checklists de equipos críticos que PE-01
+   referencia). Queda fuera del alcance actual por ser otro procedimiento,
+   y hay una definición pendiente antes de encararlo: `checklist_registro`
+   tiene un `registroPadreTipo` / `registroPadreId` genérico previendo esos
+   padres, pero PM-04 todavía no tiene tabla de cabecera propia definida en
+   la especificación — hay que decidir cómo se agrupa un control de PM-04
+   (¿uno por mes? ¿por marea?). Los ítems del Anexo A ya vienen en el seed.
 2. **Autenticación y roles reales.** Hoy no hay login: cualquiera puede
    entrar a `/bordo` o `/tierra`. Definir cómo se identifica quién carga y
    quién revisa (afecta `createdBy` / `revisadoPor`, hoy texto libre).

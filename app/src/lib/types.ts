@@ -31,6 +31,23 @@ export type RegistroEmergenciaCompleto = Prisma.RegistroEmergenciaGetPayload<{
   };
 }>;
 
+export type BoteRescateCompleto = Prisma.BoteRescateControlGetPayload<{
+  include: {
+    confirmadoPor: { select: { id: true; apellidoNombre: true; puesto: true } };
+    checklistRegistros: { include: { checklistConfig: true } };
+    revisiones: true;
+  };
+}>;
+
+export type ChecklistConfigItem = Prisma.ChecklistConfigGetPayload<Record<string, never>>;
+
+export const TIPO_CHECKLIST_BOTE_LABEL: Record<string, string> = {
+  bote_exterior: "Inspección exterior",
+  bote_interior: "Inspección interior",
+  bote_pescante: "Pescante y sistema de izado",
+  bote_inventario: "Inventario de a bordo",
+};
+
 export type TipoRegistroEmergencia = "sin_gobierno" | "colision" | "incendio" | "varadura" | "remolque";
 
 export const TIPO_EMERGENCIA_LABEL: Record<TipoRegistroEmergencia, string> = {
