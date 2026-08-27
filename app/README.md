@@ -57,6 +57,7 @@ asignar PIN por tripulante y no sembrar ninguno.
 Otros comandos útiles:
 
 ```bash
+npm run db:demo    # carga un escenario de demo para recorrer la plataforma
 npm test           # tests unitarios (node:test, sin dependencias extra)
 npm run db:studio  # explorador visual de la base (Prisma Studio)
 npm run lint
