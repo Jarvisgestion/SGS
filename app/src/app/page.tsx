@@ -1,5 +1,18 @@
 import Link from "next/link";
 
+const REGISTROS = [
+  {
+    nombre: "RE-01 A — Ejercicio de Zafarrancho",
+    bordo: "/bordo/zafarrancho",
+    tierra: "/tierra/zafarrancho",
+  },
+  {
+    nombre: "RE-01 B/C/D/E/R — Registros de emergencia",
+    bordo: "/bordo/emergencia",
+    tierra: "/tierra/emergencia",
+  },
+];
+
 export default function Home() {
   return (
     <main className="mx-auto flex max-w-2xl flex-1 flex-col justify-center gap-8 px-6 py-16">
@@ -9,30 +22,30 @@ export default function Home() {
           Preparación para Emergencias a Bordo
         </h1>
         <p className="mt-2 text-neutral-600">
-          MVP piloto de la plataforma SGS digital. Elegí desde dónde vas a trabajar.
+          MVP piloto de la plataforma SGS digital. Elegí un registro y desde dónde vas a trabajar.
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Link
-          href="/bordo/zafarrancho"
-          className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm transition hover:border-blue-400 hover:shadow"
-        >
-          <h2 className="text-lg font-semibold">A bordo</h2>
-          <p className="mt-1 text-sm text-neutral-600">
-            Cargar el Registro de Ejercicio de Zafarrancho (RE-01 A) y firmar.
-          </p>
-        </Link>
-
-        <Link
-          href="/tierra/zafarrancho"
-          className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm transition hover:border-blue-400 hover:shadow"
-        >
-          <h2 className="text-lg font-semibold">Tierra</h2>
-          <p className="mt-1 text-sm text-neutral-600">
-            Revisar los registros sincronizados y aprobarlos u observarlos.
-          </p>
-        </Link>
+      <div className="space-y-4">
+        {REGISTROS.map((r) => (
+          <div key={r.nombre} className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+            <h2 className="font-semibold">{r.nombre}</h2>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Link
+                href={r.bordo}
+                className="rounded border border-blue-600 px-3 py-2 text-center text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+              >
+                A bordo — carga y firma
+              </Link>
+              <Link
+                href={r.tierra}
+                className="rounded border border-neutral-300 px-3 py-2 text-center text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
+              >
+                Tierra — revisión
+              </Link>
+            </div>
+          </div>
+        ))}
       </div>
     </main>
   );
