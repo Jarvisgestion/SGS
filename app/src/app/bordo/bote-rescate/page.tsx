@@ -8,6 +8,7 @@ import {
   type BoteRescateCompleto,
   type ChecklistConfigItem,
 } from "@/lib/types";
+import { itemNoConformeSinObservacion } from "@/lib/validation";
 
 type Tripulante = { id: string; apellidoNombre: string; puesto: string };
 type ItemEstado = { estado: "OK" | "NO_OK"; observacion: string };
@@ -45,6 +46,9 @@ export default function BordoBoteRescatePage() {
   const [errors, setErrors] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [okMessage, setOkMessage] = useState<string | null>(null);
+  // Recién después de un intento de envío se marcan en rojo los ítems que
+  // faltan: señalarlos mientras se completa el checklist sería ruido.
+  const [intentoEnvio, setIntentoEnvio] = useState(false);
 
   async function cargar() {
     setLoading(true);
@@ -98,6 +102,7 @@ export default function BordoBoteRescatePage() {
     );
     setConfirmadoPorId("");
     setPin("");
+    setIntentoEnvio(false);
   }
 
   function cargarParaEditar(ctrl: BoteRescateCompleto) {
@@ -125,6 +130,7 @@ export default function BordoBoteRescatePage() {
     setPin("");
     setErrors([]);
     setOkMessage(null);
+    setIntentoEnvio(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -132,6 +138,22 @@ export default function BordoBoteRescatePage() {
     e.preventDefault();
     setErrors([]);
     setOkMessage(null);
+    setIntentoEnvio(true);
+
+    // Todo ítem "No OK" tiene que explicar el desvío. Se valida acá para poder
+    // nombrar los ítems concretos; el servidor lo revalida igual.
+    const sinObservacion = checklist.filter((c) =>
+      itemNoConformeSinObservacion(items[c.id] ?? { estado: "OK", observacion: "" })
+    );
+    if (sinObservacion.length > 0) {
+      setErrors([
+        `Falta la observación en ${sinObservacion.length} ítem(s) marcados "No OK": ${sinObservacion
+          .map((c) => c.item)
+          .join(", ")}.`,
+      ]);
+      return;
+    }
+
     setSubmitting(true);
 
     const payload = {
@@ -230,8 +252,14 @@ export default function BordoBoteRescatePage() {
             <div className="space-y-2">
               {configs.map((c) => {
                 const it = items[c.id] ?? { estado: "OK" as const, observacion: "" };
+                const faltaObservacion = itemNoConformeSinObservacion(it);
                 return (
-                  <div key={c.id} className="rounded border border-neutral-200 p-2">
+                  <div
+                    key={c.id}
+                    className={`rounded border p-2 ${
+                      faltaObservacion && intentoEnvio ? "border-red-400 bg-red-50" : "border-neutral-200"
+                    }`}
+                  >
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-sm">
                         {c.item}
@@ -260,15 +288,26 @@ export default function BordoBoteRescatePage() {
                         ))}
                       </div>
                     </div>
-                    {it.estado === "NO_OK" && (
-                      <input
-                        value={it.observacion}
-                        onChange={(e) =>
-                          setItems({ ...items, [c.id]: { ...it, observacion: e.target.value } })
-                        }
-                        placeholder="Observación del ítem no conforme"
-                        className="mt-2 w-full rounded border border-red-300 p-2 text-sm"
-                      />
+                    {/* Siempre visible: en "No OK" es obligatoria, en "OK" opcional. */}
+                    <input
+                      value={it.observacion}
+                      onChange={(e) =>
+                        setItems({ ...items, [c.id]: { ...it, observacion: e.target.value } })
+                      }
+                      placeholder={
+                        it.estado === "NO_OK"
+                          ? "Observación del ítem no conforme (obligatoria)"
+                          : "Observación (opcional)"
+                      }
+                      aria-invalid={faltaObservacion && intentoEnvio}
+                      className={`mt-2 w-full rounded border p-2 text-sm ${
+                        it.estado === "NO_OK" ? "border-red-300" : "border-neutral-300"
+                      }`}
+                    />
+                    {faltaObservacion && intentoEnvio && (
+                      <p className="mt-1 text-xs text-red-700">
+                        Explicá el desvío para poder enviar el control.
+                      </p>
                     )}
                   </div>
                 );

@@ -116,22 +116,25 @@ ella, cada nueva revisión pisaría el comentario/decisión anterior — y la
 sección 2.5 exige trazabilidad completa de "el historial de idas y vueltas si
 hubo observaciones". Queda documentado en `prisma/schema.prisma`.
 
-## Decisiones abiertas (para definir con el usuario)
+## Reglas de negocio definidas fuera de la especificación
 
-- **¿Un ítem marcado "No OK" debería exigir observación?** Hoy es opcional:
-  se puede enviar un control con un ítem no conforme sin explicar por qué,
-  y tierra lo ve en rojo pero sin detalle. Se dejó opcional porque la
-  especificación no lo pide, pero es una decisión de negocio a confirmar.
+- **Un ítem "No OK" exige observación; uno "OK" la tiene opcional.** Un ítem
+  no conforme sin explicación no le sirve a tierra para revisar. Se valida
+  en el cliente (nombrando los ítems que faltan) y de nuevo en el servidor
+  (`crearBoteRescateSchema`, en `src/lib/validation.ts`).
 
 ## Próximos pasos sugeridos
 
 1. **PM-04 Anexo A/B** (los checklists de equipos críticos que PE-01
-   referencia). Queda fuera del alcance actual por ser otro procedimiento,
-   y hay una definición pendiente antes de encararlo: `checklist_registro`
-   tiene un `registroPadreTipo` / `registroPadreId` genérico previendo esos
-   padres, pero PM-04 todavía no tiene tabla de cabecera propia definida en
-   la especificación — hay que decidir cómo se agrupa un control de PM-04
-   (¿uno por mes? ¿por marea?). Los ítems del Anexo A ya vienen en el seed.
+   referencia). Queda fuera del alcance actual por ser otro procedimiento.
+   Dos datos ya relevados para cuando se encare:
+   - **Periodicidad: mensual en casi todos los casos.** Es el criterio de
+     agrupación de un control de PM-04 (uno por mes, no por marea). Queda
+     acá sólo como referencia — no está implementado ni modelado.
+   - `checklist_registro` ya tiene un `registroPadreTipo` /
+     `registroPadreId` genérico previendo esos padres, y los ítems del
+     Anexo A ya vienen en el seed. Falta la tabla de cabecera de PM-04, que
+     la especificación todavía no define.
 2. **Autenticación y roles reales.** Hoy no hay login: cualquiera puede
    entrar a `/bordo` o `/tierra`. Definir cómo se identifica quién carga y
    quién revisa (afecta `createdBy` / `revisadoPor`, hoy texto libre).

@@ -138,19 +138,42 @@ export const TIPOS_CHECKLIST_BOTE = [
 const itemChecklistSchema = z.object({
   checklistConfigId: z.string().min(1),
   estado: z.enum(["OK", "NO_OK"]),
+  // Obligatoria si el ítem es NO_OK, opcional si es OK — ver el superRefine
+  // de `crearBoteRescateSchema`, que es donde se aplica la regla.
   observacion: z.string().optional().nullable(),
 });
 
-export const crearBoteRescateSchema = z.object({
-  marea: z.string().optional().nullable(),
-  singladura: z.string().optional().nullable(),
-  fechaHora: z.coerce.date(),
-  ubicacionPosicion: z.string().optional().nullable(),
-  observaciones: z.string().optional().nullable(),
-  items: z.array(itemChecklistSchema).min(1, "El checklist no puede estar vacío"),
-  // Confirmación por PIN (especificación, sección 4) en lugar de firma manuscrita.
-  confirmadoPorId: z.string().min(1, "Indicá quién confirma el checklist"),
-  pin: z.string().min(1, "Ingresá el PIN de confirmación"),
-});
+/** Un ítem no conforme sin explicación no le sirve a nadie en tierra. */
+export function itemNoConformeSinObservacion(item: {
+  estado: "OK" | "NO_OK";
+  observacion?: string | null;
+}) {
+  return item.estado === "NO_OK" && !item.observacion?.trim();
+}
+
+export const crearBoteRescateSchema = z
+  .object({
+    marea: z.string().optional().nullable(),
+    singladura: z.string().optional().nullable(),
+    fechaHora: z.coerce.date(),
+    ubicacionPosicion: z.string().optional().nullable(),
+    observaciones: z.string().optional().nullable(),
+    items: z.array(itemChecklistSchema).min(1, "El checklist no puede estar vacío"),
+    // Confirmación por PIN (especificación, sección 4) en lugar de firma manuscrita.
+    confirmadoPorId: z.string().min(1, "Indicá quién confirma el checklist"),
+    pin: z.string().min(1, "Ingresá el PIN de confirmación"),
+  })
+  .superRefine((data, ctx) => {
+    // Regla de negocio: todo ítem marcado "No OK" tiene que explicar el desvío.
+    // Un ítem OK puede llevar observación, pero no está obligado.
+    const faltantes = data.items.filter(itemNoConformeSinObservacion).length;
+    if (faltantes > 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["items"],
+        message: `Hay ${faltantes} ítem(s) marcados "No OK" sin observación. Todo ítem no conforme debe explicar el desvío.`,
+      });
+    }
+  });
 
 export const editarBoteRescateSchema = crearBoteRescateSchema;
