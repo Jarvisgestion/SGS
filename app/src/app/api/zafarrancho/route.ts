@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { readJsonBody } from "@/lib/http";
 import { getBuqueActivo } from "@/lib/buque";
 import { crearZafarranchoSchema } from "@/lib/validation";
 
@@ -25,8 +26,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const buque = await getBuqueActivo();
 
-  const json = await request.json();
-  const parsed = crearZafarranchoSchema.safeParse(json);
+  const raw = await readJsonBody(request);
+  if (!raw.ok) return raw.response;
+  const parsed = crearZafarranchoSchema.safeParse(raw.value);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }

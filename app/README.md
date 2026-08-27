@@ -61,8 +61,7 @@ npm run build
   `tipo_zafarrancho`, `checklist_config`), el ejercicio de zafarrancho
   (RE-01 A) y los registros de emergencia B/C/D/E/R con sus tablas de
   extensión — ver `prisma/schema.prisma`.
-- **API + UI de punta a punta solo para RE-01 A** (zafarrancho), como prueba
-  de concepto del flujo bordo → tierra:
+- **API + UI de punta a punta para RE-01 A** (ejercicio de zafarrancho):
   - `POST /api/zafarrancho` — carga a bordo
   - `GET /api/zafarrancho` — listado (con filtro `?estado=`)
   - `GET /api/zafarrancho/[id]` — detalle
@@ -71,6 +70,17 @@ npm run build
     observado, con comentario obligatorio si observa)
   - `GET /api/catalogos` — tipos de zafarrancho y tripulación activa, para
     poblar los selects del formulario
+- **API + UI de punta a punta para RE-01 B/C/D/E/R** (registros de
+  emergencia), con los mismos endpoints bajo
+  `/api/registros-emergencia`. El formulario a bordo es *tipo-aware*: al
+  elegir el tipo (sin gobierno / colisión / incendio / varadura / remolque)
+  se muestran únicamente los campos de la tabla de extensión que
+  corresponde. El tipo no se puede cambiar al corregir un registro ya
+  cargado, para no dejar huérfanos los datos de la extensión anterior.
+
+Ambos flujos están verificados de punta a punta en navegador: alta con
+firma → revisión en tierra → observación con comentario → corrección a
+bordo → aprobación, con el historial de revisiones completo.
 
 ### Decisión de diseño no explícita en la especificación
 
@@ -83,10 +93,14 @@ observaciones". Queda documentado en `prisma/schema.prisma`.
 
 ## Próximos pasos sugeridos
 
-1. **Extender a los demás registros de PE-01** (RE-01 B/C/D/E/R y los
-   checklists de RE-01 F / PM-04) reutilizando el mismo patrón de API + UI
-   que ya funciona para el zafarrancho. El schema de esos registros ya está
-   modelado.
+1. **Completar PE-01 con los checklists** (RE-01 F — bote de rescate — y
+   PM-04 Anexo A/B), reutilizando el mismo patrón de API + UI. El schema
+   (`bote_rescate_control`, `checklist_registro`, `checklist_config`) ya está
+   modelado y el catálogo de ítems del Anexo A ya viene en el seed.
+   Nota: `checklist_registro` tiene hoy un `registroPadreTipo` /
+   `registroPadreId` genérico previendo los padres de PM-04, que todavía no
+   tienen tabla de cabecera propia definida en la especificación — conviene
+   resolver eso al encarar este paso.
 2. **Autenticación y roles reales.** Hoy no hay login: cualquiera puede
    entrar a `/bordo` o `/tierra`. Definir cómo se identifica quién carga y
    quién revisa (afecta `createdBy` / `revisadoPor`, hoy texto libre).

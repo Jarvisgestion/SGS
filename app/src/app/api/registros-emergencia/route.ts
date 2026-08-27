@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { readJsonBody } from "@/lib/http";
 import { getBuqueActivo } from "@/lib/buque";
 import { crearRegistroEmergenciaSchema } from "@/lib/validation";
 import { extCreateData, registroEmergenciaInclude } from "@/lib/registroEmergencia";
@@ -23,8 +24,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const buque = await getBuqueActivo();
 
-  const json = await request.json();
-  const parsed = crearRegistroEmergenciaSchema.safeParse(json);
+  const raw = await readJsonBody(request);
+  if (!raw.ok) return raw.response;
+  const parsed = crearRegistroEmergenciaSchema.safeParse(raw.value);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }

@@ -186,8 +186,13 @@ export default function TierraEmergenciaPage() {
               <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                 {EXT_FIELDS[seleccionado.tipo as TipoRegistroEmergencia].map((f) => {
                   const raw = (extDeRegistro(seleccionado) as Record<string, unknown>)[f.key];
-                  const value =
-                    f.type === "boolean" ? (raw ? "Sí" : "No") : raw ? String(raw).slice(0, 10) : "—";
+                  let value: string;
+                  if (f.type === "boolean") value = raw ? "Sí" : "No";
+                  else if (raw == null || raw === "") value = "—";
+                  // Solo las fechas se recortan (llegan como ISO y se muestra YYYY-MM-DD);
+                  // el texto libre se muestra completo — es lo que tierra tiene que revisar.
+                  else if (f.type === "date") value = new Date(String(raw)).toLocaleDateString("es-AR");
+                  else value = String(raw);
                   return (
                     <Fragment key={f.key}>
                       <dt className="text-neutral-500">{f.label}</dt>

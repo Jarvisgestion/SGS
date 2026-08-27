@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { readJsonBody } from "@/lib/http";
 import { revisionSchema } from "@/lib/validation";
 import { registroEmergenciaInclude } from "@/lib/registroEmergencia";
 
@@ -20,8 +21,9 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     );
   }
 
-  const json = await request.json();
-  const parsed = revisionSchema.safeParse(json);
+  const raw = await readJsonBody(request);
+  if (!raw.ok) return raw.response;
+  const parsed = revisionSchema.safeParse(raw.value);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
