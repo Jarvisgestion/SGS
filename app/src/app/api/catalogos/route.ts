@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireUsuario } from "@/lib/auth";
 import { getBuqueActivo } from "@/lib/buque";
 import { TIPOS_CHECKLIST_BOTE } from "@/lib/validation";
 
 // GET /api/catalogos — catálogos base para armar los formularios a bordo:
 // tipos de zafarrancho, tripulación activa e ítems de checklist del bote.
 export async function GET() {
+  const auth = await requireUsuario();
+  if (!auth.ok) return auth.response;
+
   const buque = await getBuqueActivo();
 
   const [tiposZafarrancho, tripulantes, checklistBote] = await Promise.all([

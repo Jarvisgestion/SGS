@@ -38,6 +38,7 @@ model Buque {
   zafarranchoEjercicios ZafarranchoEjercicio[]
   registrosEmergencia   RegistroEmergencia[]
   botesRescateControl   BoteRescateControl[]
+  usuarios              Usuario[]
 
   @@map("buque")
 }
@@ -60,9 +61,63 @@ model Tripulante {
   buque                   Buque                     @relation(fields: [buqueId], references: [id])
   participaciones         ZafarranchoParticipante[]
   botesRescateConfirmados BoteRescateControl[]
+  usuario                 Usuario?
 
   @@unique([buqueId, dni])
   @@map("tripulante")
+}
+
+// ---------------------------------------------------------------------------
+// Autenticación y roles (sección 3 de la especificación)
+//
+// Dos roles, los que la especificación define: `bordo` carga registros y
+// firma; `tierra` los revisa (aprueba u observa). El rol de administrador
+// para gestionar catálogos queda explícitamente "a definir en una etapa
+// posterior" en la especificación, así que no se modela todavía.
+// ---------------------------------------------------------------------------
+
+model Usuario {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  nombre       String
+  rol          String // bordo | tierra
+  /// Los usuarios de a bordo pertenecen a un buque; los de tierra (asesor,
+  /// Persona Designada) no, porque operan sobre toda la flota.
+  buqueId      String?  @map("buque_id")
+  /// Vínculo opcional con la ficha de tripulación, para no duplicar la persona.
+  tripulanteId String?  @unique @map("tripulante_id")
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  buque      Buque?      @relation(fields: [buqueId], references: [id])
+  tripulante Tripulante? @relation(fields: [tripulanteId], references: [id])
+  sesiones   Sesion[]
+
+  zafarranchosCreados          ZafarranchoEjercicio[]
+  registrosEmergenciaCreados   RegistroEmergencia[]
+  botesRescateCreados          BoteRescateControl[]
+  zafarranchoRevisiones        ZafarranchoRevision[]
+  registroEmergenciaRevisiones RegistroEmergenciaRevision[]
+  boteRescateRevisiones        BoteRescateControlRevision[]
+
+  @@map("usuario")
+}
+
+/// Sesión con token opaco guardado en base, no un JWT: así se puede revocar
+/// (logout, baja de usuario) sin depender de la expiración del token.
+model Sesion {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  usuarioId String   @map("usuario_id")
+  expiraAt  DateTime @map("expira_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("sesion")
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +198,10 @@ model ZafarranchoEjercicio {
   submittedAt         DateTime? @map("submitted_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
+  creadoPorId String? @map("creado_por_id")
+
   buque           Buque                     @relation(fields: [buqueId], references: [id])
+  creadoPor       Usuario?                  @relation(fields: [creadoPorId], references: [id])
   tipoZafarrancho TipoZafarrancho           @relation(fields: [tipoZafarranchoId], references: [id])
   participantes   ZafarranchoParticipante[]
   revisiones      ZafarranchoRevision[]
@@ -170,14 +228,18 @@ model ZafarranchoParticipante {
 /// hubo observaciones" (sección 2.5): sin esta tabla, cada nueva revisión
 /// pisaría el comentario/decisión anterior en `zafarrancho_ejercicio`.
 model ZafarranchoRevision {
-  id          String   @id @default(cuid())
-  ejercicioId String   @map("ejercicio_id")
-  decision    String // aprobado | observado
-  comentario  String?
-  revisadoPor String   @map("revisado_por")
-  revisadoAt  DateTime @default(now()) @map("revisado_at")
+  id            String   @id @default(cuid())
+  ejercicioId   String   @map("ejercicio_id")
+  decision      String // aprobado | observado
+  comentario    String?
+  /// Nombre al momento de revisar: se conserva como snapshot para la auditoría
+  /// de PNA aunque el usuario cambie de nombre o se dé de baja.
+  revisadoPor   String   @map("revisado_por")
+  revisadoPorId String?  @map("revisado_por_id")
+  revisadoAt    DateTime @default(now()) @map("revisado_at")
 
-  ejercicio ZafarranchoEjercicio @relation(fields: [ejercicioId], references: [id], onDelete: Cascade)
+  ejercicio          ZafarranchoEjercicio @relation(fields: [ejercicioId], references: [id], onDelete: Cascade)
+  revisadoPorUsuario Usuario?             @relation(fields: [revisadoPorId], references: [id])
 
   @@map("zafarrancho_revision")
 }
@@ -207,7 +269,10 @@ model RegistroEmergencia {
   submittedAt                    DateTime? @map("submitted_at")
   updatedAt                      DateTime  @updatedAt @map("updated_at")
 
+  creadoPorId String? @map("creado_por_id")
+
   buque          Buque                        @relation(fields: [buqueId], references: [id])
+  creadoPor      Usuario?                     @relation(fields: [creadoPorId], references: [id])
   extSinGobierno ExtSinGobierno?
   extColision    ExtColision?
   extIncendio    ExtIncendio?
@@ -298,14 +363,16 @@ model ExtRemolque {
 
 /// Mismo motivo que `ZafarranchoRevision`: historial de revisión en tierra.
 model RegistroEmergenciaRevision {
-  id          String   @id @default(cuid())
-  registroId  String   @map("registro_id")
-  decision    String // aprobado | observado
-  comentario  String?
-  revisadoPor String   @map("revisado_por")
-  revisadoAt  DateTime @default(now()) @map("revisado_at")
+  id            String   @id @default(cuid())
+  registroId    String   @map("registro_id")
+  decision      String // aprobado | observado
+  comentario    String?
+  revisadoPor   String   @map("revisado_por")
+  revisadoPorId String?  @map("revisado_por_id")
+  revisadoAt    DateTime @default(now()) @map("revisado_at")
 
-  registro RegistroEmergencia @relation(fields: [registroId], references: [id], onDelete: Cascade)
+  registro           RegistroEmergencia @relation(fields: [registroId], references: [id], onDelete: Cascade)
+  revisadoPorUsuario Usuario?           @relation(fields: [revisadoPorId], references: [id])
 
   @@map("registro_emergencia_revision")
 }
@@ -333,7 +400,10 @@ model BoteRescateControl {
   submittedAt       DateTime? @map("submitted_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
+  creadoPorId String? @map("creado_por_id")
+
   buque              Buque                        @relation(fields: [buqueId], references: [id])
+  creadoPor          Usuario?                     @relation(fields: [creadoPorId], references: [id])
   confirmadoPor      Tripulante?                  @relation(fields: [confirmadoPorId], references: [id])
   checklistRegistros ChecklistRegistro[]
   revisiones         BoteRescateControlRevision[]
@@ -343,14 +413,16 @@ model BoteRescateControl {
 
 /// Mismo motivo que `ZafarranchoRevision`: historial de revisión en tierra.
 model BoteRescateControlRevision {
-  id          String   @id @default(cuid())
-  controlId   String   @map("control_id")
-  decision    String // aprobado | observado
-  comentario  String?
-  revisadoPor String   @map("revisado_por")
-  revisadoAt  DateTime @default(now()) @map("revisado_at")
+  id            String   @id @default(cuid())
+  controlId     String   @map("control_id")
+  decision      String // aprobado | observado
+  comentario    String?
+  revisadoPor   String   @map("revisado_por")
+  revisadoPorId String?  @map("revisado_por_id")
+  revisadoAt    DateTime @default(now()) @map("revisado_at")
 
-  control BoteRescateControl @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  control            BoteRescateControl @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  revisadoPorUsuario Usuario?           @relation(fields: [revisadoPorId], references: [id])
 
   @@map("bote_rescate_control_revision")
 }

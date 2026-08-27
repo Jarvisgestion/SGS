@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { hashPin } from "../src/lib/pin";
+import { hashSecret } from "../src/lib/hash";
 
 const prisma = new PrismaClient();
 
@@ -149,6 +150,38 @@ async function main() {
         },
       });
     }
+  }
+
+  // Usuarios de demo. Igual criterio que los PIN: contraseñas de juguete, a la
+  // vista a propósito para el piloto local. En un entorno real hay que crear
+  // los usuarios con contraseñas propias y NO sembrar ninguna.
+  const capitan = await prisma.tripulante.findFirst({
+    where: { buqueId: buque.id, dni: "20111222" },
+  });
+  const usuariosSeed = [
+    {
+      email: "capitan@pesantar.test",
+      nombre: "Fernández, Carlos",
+      rol: "bordo",
+      buqueId: buque.id,
+      tripulanteId: capitan?.id ?? null,
+    },
+    {
+      // Tierra no se ata a un buque: el asesor opera sobre toda la flota.
+      email: "asesor@pesantar.test",
+      nombre: "Asesor de Seguridad",
+      rol: "tierra",
+      buqueId: null,
+      tripulanteId: null,
+    },
+  ];
+  for (const u of usuariosSeed) {
+    const passwordHash = await hashSecret("demo1234");
+    await prisma.usuario.upsert({
+      where: { email: u.email },
+      update: { passwordHash, nombre: u.nombre, rol: u.rol, buqueId: u.buqueId },
+      create: { ...u, passwordHash },
+    });
   }
 
   console.log("Seed completo:", { buqueId: buque.id, buque: buque.nombre });

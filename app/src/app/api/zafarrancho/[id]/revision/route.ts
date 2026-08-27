@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireUsuario } from "@/lib/auth";
 import { readJsonBody } from "@/lib/http";
 import { revisionSchema } from "@/lib/validation";
 
@@ -7,6 +8,9 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 // POST /api/zafarrancho/[id]/revision — decisión de tierra (Persona Designada / asesor).
 export async function POST(request: NextRequest, { params }: RouteContext) {
+  const auth = await requireUsuario("tierra");
+  if (!auth.ok) return auth.response;
+
   const { id } = await params;
 
   const existente = await prisma.zafarranchoEjercicio.findUnique({ where: { id } });
@@ -34,7 +38,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         ejercicioId: id,
         decision: body.decision,
         comentario: body.comentario,
-        revisadoPor: body.revisadoPor,
+        revisadoPor: auth.usuario.nombre,
+        revisadoPorId: auth.usuario.id,
       },
     }),
     prisma.zafarranchoEjercicio.update({

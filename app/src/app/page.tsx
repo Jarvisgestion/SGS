@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getUsuarioActual } from "@/lib/auth";
 
 const REGISTROS = [
   {
@@ -18,7 +20,12 @@ const REGISTROS = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const usuario = await getUsuarioActual();
+  if (!usuario) redirect("/login");
+
+  const esBordo = usuario.rol === "bordo";
+
   return (
     <main className="mx-auto flex max-w-2xl flex-1 flex-col justify-center gap-8 px-6 py-16">
       <div>
@@ -27,29 +34,24 @@ export default function Home() {
           Preparación para Emergencias a Bordo
         </h1>
         <p className="mt-2 text-neutral-600">
-          MVP piloto de la plataforma SGS digital. Elegí un registro y desde dónde vas a trabajar.
+          {esBordo
+            ? "Elegí el registro que vas a cargar."
+            : "Elegí el registro que vas a revisar."}
         </p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {REGISTROS.map((r) => (
-          <div key={r.nombre} className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+          <Link
+            key={r.nombre}
+            href={esBordo ? r.bordo : r.tierra}
+            className="block rounded-lg border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-blue-400 hover:shadow"
+          >
             <h2 className="font-semibold">{r.nombre}</h2>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Link
-                href={r.bordo}
-                className="rounded border border-blue-600 px-3 py-2 text-center text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-              >
-                A bordo — carga y firma
-              </Link>
-              <Link
-                href={r.tierra}
-                className="rounded border border-neutral-300 px-3 py-2 text-center text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
-              >
-                Tierra — revisión
-              </Link>
-            </div>
-          </div>
+            <p className="mt-1 text-sm text-neutral-600">
+              {esBordo ? "Cargar y firmar" : "Revisar, aprobar u observar"}
+            </p>
+          </Link>
         ))}
       </div>
     </main>

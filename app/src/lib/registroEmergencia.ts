@@ -21,6 +21,7 @@ export function extUpdateData(tipo: Tipo, ext: Record<string, unknown>) {
 }
 
 export const registroEmergenciaInclude = {
+  creadoPor: { select: { id: true, nombre: true, rol: true } },
   extSinGobierno: true,
   extColision: true,
   extIncendio: true,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireUsuario } from "@/lib/auth";
 import { readJsonBody } from "@/lib/http";
 import { getBuqueActivo } from "@/lib/buque";
 import { crearRegistroEmergenciaSchema } from "@/lib/validation";
@@ -7,6 +8,9 @@ import { extCreateData, registroEmergenciaInclude } from "@/lib/registroEmergenc
 
 // GET /api/registros-emergencia?estado=&tipo=
 export async function GET(request: NextRequest) {
+  const auth = await requireUsuario();
+  if (!auth.ok) return auth.response;
+
   const buque = await getBuqueActivo();
   const estado = request.nextUrl.searchParams.get("estado") ?? undefined;
   const tipo = request.nextUrl.searchParams.get("tipo") ?? undefined;
@@ -22,6 +26,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/registros-emergencia — carga a bordo de RE-01 B/C/D/E/R.
 export async function POST(request: NextRequest) {
+  const auth = await requireUsuario("bordo");
+  if (!auth.ok) return auth.response;
+
   const buque = await getBuqueActivo();
 
   const raw = await readJsonBody(request);
@@ -35,6 +42,7 @@ export async function POST(request: NextRequest) {
   const registro = await prisma.registroEmergencia.create({
     data: {
       buqueId: buque.id,
+      creadoPorId: auth.usuario.id,
       tipo,
       ...base,
       // Ver nota en POST /api/zafarrancho: llega al endpoint porque ya se

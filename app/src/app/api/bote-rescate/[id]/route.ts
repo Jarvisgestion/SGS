@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireUsuario } from "@/lib/auth";
 import { readJsonBody } from "@/lib/http";
 import { getBuqueActivo } from "@/lib/buque";
 import { editarBoteRescateSchema } from "@/lib/validation";
 import { verifyPin } from "@/lib/pin";
+import { chequearLimite, registrarExito, registrarFallo } from "@/lib/rateLimit";
 import { boteRescateInclude } from "@/lib/boteRescate";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(_request: NextRequest, { params }: RouteContext) {
+  const auth = await requireUsuario();
+  if (!auth.ok) return auth.response;
+
   const { id } = await params;
 
   const control = await prisma.boteRescateControl.findUnique({
@@ -24,6 +29,9 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 
 // PATCH /api/bote-rescate/[id] — corrección a bordo tras una observación.
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
+  const auth = await requireUsuario("bordo");
+  if (!auth.ok) return auth.response;
+
   const { id } = await params;
   const buque = await getBuqueActivo();
 
@@ -48,12 +56,24 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
   // La corrección se vuelve a confirmar con PIN: es un nuevo acto de quien
   // rehace el control, no un arrastre de la confirmación original.
+  const limite = chequearLimite(confirmadoPorId);
+  if (!limite.permitido) {
+    return NextResponse.json(
+      {
+        error: `Demasiados intentos fallidos. Volvé a intentar en ${limite.minutosRestantes} minuto(s).`,
+      },
+      { status: 429 }
+    );
+  }
+
   const confirmante = await prisma.tripulante.findFirst({
     where: { id: confirmadoPorId, buqueId: buque.id, activo: true },
   });
   if (!confirmante || !(await verifyPin(pin, confirmante.pinHash))) {
+    registrarFallo(confirmadoPorId);
     return NextResponse.json({ error: "PIN incorrecto" }, { status: 401 });
   }
+  registrarExito(confirmadoPorId);
 
   const configIds = items.map((i) => i.checklistConfigId);
   const configsValidas = await prisma.checklistConfig.count({

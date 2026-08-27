@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireUsuario } from "@/lib/auth";
 import { readJsonBody } from "@/lib/http";
 import { getBuqueActivo } from "@/lib/buque";
 import { editarZafarranchoSchema } from "@/lib/validation";
@@ -7,11 +8,15 @@ import { editarZafarranchoSchema } from "@/lib/validation";
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(_request: NextRequest, { params }: RouteContext) {
+  const auth = await requireUsuario();
+  if (!auth.ok) return auth.response;
+
   const { id } = await params;
 
   const ejercicio = await prisma.zafarranchoEjercicio.findUnique({
     where: { id },
     include: {
+      creadoPor: { select: { id: true, nombre: true, rol: true } },
       tipoZafarrancho: true,
       // `select` explícito: `tripulante: true` traería también `pinHash`.
       participantes: {
@@ -31,6 +36,9 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 
 // PATCH /api/zafarrancho/[id] — edición a bordo tras una observación, y reenvío a tierra.
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
+  const auth = await requireUsuario("bordo");
+  if (!auth.ok) return auth.response;
+
   const { id } = await params;
   const buque = await getBuqueActivo();
 
@@ -83,7 +91,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
           }
         : {}),
     },
-    include: { participantes: true, tipoZafarrancho: true },
+    include: { creadoPor: { select: { id: true, nombre: true, rol: true } }, participantes: true, tipoZafarrancho: true },
   });
 
   return NextResponse.json({ data: ejercicio });

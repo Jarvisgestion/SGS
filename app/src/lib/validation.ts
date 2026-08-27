@@ -24,7 +24,8 @@ export const revisionSchema = z
   .object({
     decision: z.enum(["aprobado", "observado"]),
     comentario: z.string().optional().nullable(),
-    revisadoPor: z.string().min(1, "Falta indicar quién revisa"),
+    // Quién revisa sale de la sesión, no del body: si lo mandara el cliente,
+    // cualquiera podría firmar una revisión con el nombre de otro.
   })
   .refine((data) => data.decision !== "observado" || !!data.comentario?.trim(), {
     message: "El comentario es obligatorio cuando se observa un registro",

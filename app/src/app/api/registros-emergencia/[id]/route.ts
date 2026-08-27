@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireUsuario } from "@/lib/auth";
 import { readJsonBody } from "@/lib/http";
 import { getBuqueActivo } from "@/lib/buque";
 import { editarRegistroEmergenciaSchema } from "@/lib/validation";
@@ -8,6 +9,9 @@ import { extUpdateData, registroEmergenciaInclude } from "@/lib/registroEmergenc
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(_request: NextRequest, { params }: RouteContext) {
+  const auth = await requireUsuario();
+  if (!auth.ok) return auth.response;
+
   const { id } = await params;
 
   const registro = await prisma.registroEmergencia.findUnique({
@@ -23,6 +27,9 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 
 // PATCH /api/registros-emergencia/[id] — edición a bordo tras una observación, y reenvío a tierra.
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
+  const auth = await requireUsuario("bordo");
+  if (!auth.ok) return auth.response;
+
   const { id } = await params;
   const buque = await getBuqueActivo();
 

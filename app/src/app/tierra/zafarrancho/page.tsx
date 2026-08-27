@@ -26,7 +26,6 @@ export default function TierraZafarranchoPage() {
 
   const [decision, setDecision] = useState<"aprobado" | "observado">("aprobado");
   const [comentario, setComentario] = useState("");
-  const [revisadoPor, setRevisadoPor] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,16 +61,12 @@ export default function TierraZafarranchoPage() {
       setError("El comentario es obligatorio para observar un registro.");
       return;
     }
-    if (!revisadoPor.trim()) {
-      setError("Indicá quién realiza la revisión.");
-      return;
-    }
 
     setEnviando(true);
     const res = await fetch(`/api/zafarrancho/${seleccionado.id}/revision`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision, comentario, revisadoPor }),
+      body: JSON.stringify({ decision, comentario }),
     });
     const json = await res.json();
     setEnviando(false);
@@ -143,6 +138,8 @@ export default function TierraZafarranchoPage() {
                 <dd>{seleccionado.marea || "—"} / {seleccionado.singladura || "—"}</dd>
                 <dt className="text-neutral-500">Foja libro navegación</dt>
                 <dd>{seleccionado.libroNavegacionFoja || "—"}</dd>
+                <dt className="text-neutral-500">Cargado por</dt>
+                <dd>{seleccionado.creadoPor?.nombre ?? "—"}</dd>
               </dl>
 
               <p className="mt-3 text-sm font-medium text-neutral-700">Temas desarrollados</p>
@@ -212,15 +209,6 @@ export default function TierraZafarranchoPage() {
                     />
                   </label>
 
-                  <label className="block text-sm">
-                    Revisado por
-                    <input
-                      value={revisadoPor}
-                      onChange={(e) => setRevisadoPor(e.target.value)}
-                      placeholder="Nombre del asesor / Persona Designada"
-                      className="mt-1 w-full rounded border border-neutral-300 p-2"
-                    />
-                  </label>
 
                   {error && <p className="text-sm text-red-700">{error}</p>}
 

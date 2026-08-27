@@ -29,9 +29,9 @@ el relevamiento más amplio que sirvió de base.
   (arrays, enums nativos).
 - **Zod** para validar los payloads de la API.
 - **react-signature-canvas** para la firma manuscrita en pantalla.
-
-No hay autenticación todavía (ver "Próximos pasos"): las vistas `/bordo` y
-`/tierra` son públicas dentro de este MVP piloto.
+- **Autenticación propia**, sin librería externa: hashing con `scrypt` del
+  módulo `crypto` de Node y sesión con token opaco en base. Ver
+  "Autenticación y roles" más abajo.
 
 ## Cómo correrlo
 
@@ -42,8 +42,12 @@ npm run db:seed       # carga el buque Pesantar 1, tripulación demo y catálogo
 npm run dev
 ```
 
-Abrí [http://localhost:3000](http://localhost:3000) y elegí el registro y la
-vista (a bordo / tierra) desde el índice.
+Abrí [http://localhost:3000](http://localhost:3000). Pide iniciar sesión y
+después muestra sólo los registros que corresponden al rol.
+
+**Usuarios de demo** (contraseña `demo1234` en ambos):
+`capitan@pesantar.test` (rol *bordo*: carga y firma) y
+`asesor@pesantar.test` (rol *tierra*: revisa, aprueba u observa).
 
 **PIN de demo** para confirmar el control del bote de rescate (RE-01 F):
 Fernández `1234`, Gómez `2345`, Pérez `3456`, Suárez `4567`. Están en
@@ -99,13 +103,45 @@ Los tres flujos están verificados de punta a punta en navegador: carga →
 revisión en tierra → observación con comentario → corrección a bordo →
 aprobación, con el historial de revisiones completo.
 
-### Sobre el PIN — alcance y límites
+## Autenticación y roles (sección 3 de la especificación)
 
-`src/lib/pin.ts` cubre la *confirmación de un checklist*, **no** es un
-sistema de autenticación: no hay sesión, ni bloqueo por reintentos, ni
-rotación de PIN. Un PIN de 4 dígitos se rompe por fuerza bruta en segundos
-si el endpoint queda expuesto sin rate limit. Antes de exponer esto fuera
-de una red controlada hace falta el login real (próximo paso 2).
+Login con email y contraseña, sesión en cookie `httpOnly` + `sameSite=lax`
+con token opaco guardado en base (revocable al salir, no un JWT). Dos roles,
+los que define la especificación:
+
+| Rol | Puede |
+|---|---|
+| `bordo` | Cargar registros, firmar, corregir los observados |
+| `tierra` | Revisar: aprobar u observar |
+
+El control es **en capas**, y la capa que importa es la del servidor:
+
+- `src/proxy.ts` sólo mira que exista la cookie, para redirigir al login en
+  vez de mostrar una pantalla vacía. Corre en el runtime Edge y no puede
+  consultar la base, así que **no** valida la sesión ni el rol.
+- Los layouts de `/bordo` y `/tierra` validan sesión y rol contra la base, y
+  redirigen si no corresponde — así nadie ve un botón que no puede usar.
+- Cada ruta de API llama a `requireUsuario(rol)`. Ésta es la que realmente
+  autoriza: ocultar un botón no impide llamar al endpoint a mano.
+
+Quién carga y quién revisa salen de la sesión, nunca del body del request:
+si el nombre del revisor viniera del cliente, cualquiera podría firmar una
+revisión con el nombre de otro. Las tablas de revisión guardan el nombre
+como *snapshot* además del id, para que la auditoría de PNA siga siendo
+legible aunque después el usuario cambie de nombre o se dé de baja.
+
+### Alcance y límites de lo que hay hoy
+
+- **El PIN de checklist no es autenticación.** Dice *quién de la tripulación
+  da por hecho un control*; la sesión dice *quién está usando la aplicación*.
+  Son cosas distintas y conviven a propósito.
+- **Rate limit del PIN en memoria del proceso** (`src/lib/rateLimit.ts`): 5
+  intentos fallidos y 15 minutos de bloqueo. Alcanza para un despliegue de un
+  solo proceso, pero se pierde al reiniciar y no se comparte entre réplicas —
+  al escalar hay que moverlo a la base o a Redis.
+- **Falta gestión de usuarios**: se crean por seed. Tampoco hay recuperación
+  de contraseña ni rotación de PIN — eso llega con la pantalla de
+  administración (próximo paso 2).
 
 ### Decisión de diseño no explícita en la especificación
 
@@ -135,13 +171,12 @@ hubo observaciones". Queda documentado en `prisma/schema.prisma`.
      `registroPadreId` genérico previendo esos padres, y los ítems del
      Anexo A ya vienen en el seed. Falta la tabla de cabecera de PM-04, que
      la especificación todavía no define.
-2. **Autenticación y roles reales.** Hoy no hay login: cualquiera puede
-   entrar a `/bordo` o `/tierra`. Definir cómo se identifica quién carga y
-   quién revisa (afecta `createdBy` / `revisadoPor`, hoy texto libre).
-3. **Pantalla de administración de catálogos** (tipos de zafarrancho, ítems
-   de checklist, tripulación) — hoy se cargan solo por seed/Prisma Studio.
-   Sección 3 de la especificación deja pendiente si este rol lo maneja el
-   asesor directamente o hace falta un admin separado.
+2. **Pantalla de administración**: alta/baja de usuarios y tripulación,
+   cambio de contraseña y de PIN, y edición de los catálogos (tipos de
+   zafarrancho, ítems de checklist) — hoy todo eso sale del seed. La
+   especificación (sección 3) deja pendiente si lo maneja el asesor
+   directamente o hace falta un rol de administrador aparte; ésa es la
+   decisión a tomar antes de construirlo.
 4. **Migrar a Postgres** en cuanto haya un entorno de despliegue real.
 5. Ajustar el catálogo de referencia (`prisma/seed.ts`) con los datos reales
    de Pesantar 1 cuando estén disponibles (REGINAVE actualizado, ordenanza

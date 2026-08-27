@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireUsuario } from "@/lib/auth";
 import { readJsonBody } from "@/lib/http";
 import { getBuqueActivo } from "@/lib/buque";
 import { crearBoteRescateSchema } from "@/lib/validation";
 import { verifyPin } from "@/lib/pin";
+import { chequearLimite, registrarExito, registrarFallo } from "@/lib/rateLimit";
 import { boteRescateInclude } from "@/lib/boteRescate";
 
 // GET /api/bote-rescate?estado=
 export async function GET(request: NextRequest) {
+  const auth = await requireUsuario();
+  if (!auth.ok) return auth.response;
+
   const buque = await getBuqueActivo();
   const estado = request.nextUrl.searchParams.get("estado") ?? undefined;
 
@@ -22,6 +27,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/bote-rescate — carga a bordo de RE-01 F, confirmada por PIN.
 export async function POST(request: NextRequest) {
+  const auth = await requireUsuario("bordo");
+  if (!auth.ok) return auth.response;
+
   const buque = await getBuqueActivo();
 
   const raw = await readJsonBody(request);
@@ -32,13 +40,25 @@ export async function POST(request: NextRequest) {
   }
   const { items, confirmadoPorId, pin, ...base } = parsed.data;
 
+  const limite = chequearLimite(confirmadoPorId);
+  if (!limite.permitido) {
+    return NextResponse.json(
+      {
+        error: `Demasiados intentos fallidos. Volvé a intentar en ${limite.minutosRestantes} minuto(s).`,
+      },
+      { status: 429 }
+    );
+  }
+
   const confirmante = await prisma.tripulante.findFirst({
     where: { id: confirmadoPorId, buqueId: buque.id, activo: true },
   });
   if (!confirmante || !(await verifyPin(pin, confirmante.pinHash))) {
+    registrarFallo(confirmadoPorId);
     // Mismo mensaje exista o no el tripulante, para no revelar quién tiene PIN cargado.
     return NextResponse.json({ error: "PIN incorrecto" }, { status: 401 });
   }
+  registrarExito(confirmadoPorId);
 
   const configIds = items.map((i) => i.checklistConfigId);
   const configsValidas = await prisma.checklistConfig.count({
@@ -59,6 +79,7 @@ export async function POST(request: NextRequest) {
     const creado = await tx.boteRescateControl.create({
       data: {
         buqueId: buque.id,
+        creadoPorId: auth.usuario.id,
         ...base,
         confirmadoPorId,
         confirmadoAt: new Date(),

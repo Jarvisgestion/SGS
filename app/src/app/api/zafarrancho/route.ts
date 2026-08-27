@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireUsuario } from "@/lib/auth";
 import { readJsonBody } from "@/lib/http";
 import { getBuqueActivo } from "@/lib/buque";
 import { crearZafarranchoSchema } from "@/lib/validation";
 
 // GET /api/zafarrancho?estado=pendiente_revision
 export async function GET(request: NextRequest) {
+  const auth = await requireUsuario();
+  if (!auth.ok) return auth.response;
+
   const buque = await getBuqueActivo();
   const estado = request.nextUrl.searchParams.get("estado") ?? undefined;
 
@@ -13,6 +17,7 @@ export async function GET(request: NextRequest) {
     where: { buqueId: buque.id, ...(estado ? { estado } : {}) },
     orderBy: { createdAt: "desc" },
     include: {
+      creadoPor: { select: { id: true, nombre: true, rol: true } },
       tipoZafarrancho: true,
       participantes: true,
       revisiones: { orderBy: { revisadoAt: "desc" } },
@@ -24,6 +29,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/zafarrancho — carga a bordo del Registro de Ejercicio de Zafarrancho (RE-01 A)
 export async function POST(request: NextRequest) {
+  const auth = await requireUsuario("bordo");
+  if (!auth.ok) return auth.response;
+
   const buque = await getBuqueActivo();
 
   const raw = await readJsonBody(request);
@@ -58,6 +66,7 @@ export async function POST(request: NextRequest) {
   const ejercicio = await prisma.zafarranchoEjercicio.create({
     data: {
       buqueId: buque.id,
+      creadoPorId: auth.usuario.id,
       tipoZafarranchoId: body.tipoZafarranchoId,
       marea: body.marea,
       singladura: body.singladura,
@@ -81,7 +90,7 @@ export async function POST(request: NextRequest) {
         })),
       },
     },
-    include: { participantes: true, tipoZafarrancho: true },
+    include: { creadoPor: { select: { id: true, nombre: true, rol: true } }, participantes: true, tipoZafarrancho: true },
   });
 
   return NextResponse.json({ data: ejercicio }, { status: 201 });

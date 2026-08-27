@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 export type ZafarranchoEjercicioCompleto = Prisma.ZafarranchoEjercicioGetPayload<{
   include: {
+    creadoPor: { select: { id: true; nombre: true; rol: true } };
     tipoZafarrancho: true;
     participantes: true;
     revisiones: true;
@@ -22,6 +23,7 @@ export const ESTADO_LABEL: Record<Estado, string> = {
 
 export type RegistroEmergenciaCompleto = Prisma.RegistroEmergenciaGetPayload<{
   include: {
+    creadoPor: { select: { id: true; nombre: true; rol: true } };
     extSinGobierno: true;
     extColision: true;
     extIncendio: true;
@@ -33,6 +35,7 @@ export type RegistroEmergenciaCompleto = Prisma.RegistroEmergenciaGetPayload<{
 
 export type BoteRescateCompleto = Prisma.BoteRescateControlGetPayload<{
   include: {
+    creadoPor: { select: { id: true; nombre: true; rol: true } };
     confirmadoPor: { select: { id: true; apellidoNombre: true; puesto: true } };
     checklistRegistros: { include: { checklistConfig: true } };
     revisiones: true;

@@ -31,7 +31,6 @@ export default function TierraBoteRescatePage() {
 
   const [decision, setDecision] = useState<"aprobado" | "observado">("aprobado");
   const [comentario, setComentario] = useState("");
-  const [revisadoPor, setRevisadoPor] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,16 +71,12 @@ export default function TierraBoteRescatePage() {
       setError("El comentario es obligatorio para observar un control.");
       return;
     }
-    if (!revisadoPor.trim()) {
-      setError("Indicá quién realiza la revisión.");
-      return;
-    }
 
     setEnviando(true);
     const res = await fetch(`/api/bote-rescate/${seleccionado.id}/revision`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision, comentario, revisadoPor }),
+      body: JSON.stringify({ decision, comentario }),
     });
     const json = await res.json();
     setEnviando(false);
@@ -155,6 +150,8 @@ export default function TierraBoteRescatePage() {
             <div className="rounded border border-neutral-200 bg-white p-4 shadow-sm">
               <h2 className="font-semibold">{new Date(seleccionado.fechaHora).toLocaleString("es-AR")}</h2>
               <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                <dt className="text-neutral-500">Cargado por</dt>
+                <dd>{seleccionado.creadoPor?.nombre ?? "—"}</dd>
                 <dt className="text-neutral-500">Ubicación / posición</dt>
                 <dd>{seleccionado.ubicacionPosicion || "—"}</dd>
                 <dt className="text-neutral-500">Marea / Singladura</dt>
@@ -244,15 +241,6 @@ export default function TierraBoteRescatePage() {
                     />
                   </label>
 
-                  <label className="block text-sm">
-                    Revisado por
-                    <input
-                      value={revisadoPor}
-                      onChange={(e) => setRevisadoPor(e.target.value)}
-                      placeholder="Nombre del asesor / Persona Designada"
-                      className="mt-1 w-full rounded border border-neutral-300 p-2"
-                    />
-                  </label>
 
                   {error && <p className="text-sm text-red-700">{error}</p>}
 
