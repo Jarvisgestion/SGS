@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUsuarioActual } from "@/lib/auth";
+import { getBuqueActivo } from "@/lib/buque";
+import { obtenerCumplimiento } from "@/lib/cumplimientoQuery";
 
 const REGISTROS = [
   {
@@ -26,6 +28,12 @@ export default async function Home() {
 
   const esBordo = usuario.rol === "bordo";
 
+  const buque = await getBuqueActivo();
+  const cumplimiento = await obtenerCumplimiento(buque.id);
+  const vencidos = cumplimiento.filter((c) => c.estado === "vencido").length;
+  const porVencer = cumplimiento.filter((c) => c.estado === "por_vencer").length;
+  const pendiente = vencidos + porVencer;
+
   return (
     <main className="mx-auto flex max-w-2xl flex-1 flex-col justify-center gap-8 px-6 py-16">
       <div>
@@ -39,6 +47,22 @@ export default async function Home() {
             : "Elegí el registro que vas a revisar."}
         </p>
       </div>
+
+      <Link
+        href="/cumplimiento"
+        className={`block rounded-lg border p-5 shadow-sm transition hover:shadow ${
+          pendiente > 0
+            ? "border-amber-300 bg-amber-50 hover:border-amber-400"
+            : "border-neutral-200 bg-white hover:border-blue-400"
+        }`}
+      >
+        <h2 className="font-semibold">Cumplimiento de zafarranchos</h2>
+        <p className="mt-1 text-sm text-neutral-700">
+          {vencidos > 0 && <strong>{vencidos} vencido(s). </strong>}
+          {porVencer > 0 && <>{porVencer} por vencer. </>}
+          {pendiente === 0 && "Todos los zafarranchos están al día."}
+        </p>
+      </Link>
 
       <div className="space-y-3">
         {REGISTROS.map((r) => (

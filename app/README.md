@@ -57,6 +57,7 @@ asignar PIN por tripulante y no sembrar ninguno.
 Otros comandos útiles:
 
 ```bash
+npm test           # tests unitarios (node:test, sin dependencias extra)
 npm run db:studio  # explorador visual de la base (Prisma Studio)
 npm run lint
 npm run build
@@ -102,6 +103,28 @@ npm run build
 Los tres flujos están verificados de punta a punta en navegador: carga →
 revisión en tierra → observación con comentario → corrección a bordo →
 aprobación, con el historial de revisiones completo.
+
+## Cumplimiento de zafarranchos (`/cumplimiento`)
+
+Cada tipo de zafarrancho guarda su periodicidad; esta pantalla es lo que le
+da sentido a ese dato: por tipo muestra el último ejercicio aprobado, cuándo
+vence el próximo y si está al día, por vencer, vencido o sin registros. La
+home muestra el conteo, así que al entrar se ve si hay algo pendiente.
+Accesible para los dos roles: a bordo para saber qué toca, en tierra para
+ver el estado de la flota.
+
+Dos criterios definidos acá, no en la especificación:
+
+- **Sólo cuentan los ejercicios `aprobado`.** Uno cargado y todavía sin
+  revisar no es evidencia ante una inspección. Igual se muestran aparte
+  ("N esperando revisión de tierra") para no dar por vencido sin más algo
+  que ya se hizo.
+- **El aviso de "por vencer" salta al 20% restante del período** — 6 días
+  para uno de 30, 73 para uno anual. Escala con la periodicidad en vez de
+  usar un número fijo que sería inútil en un extremo u otro.
+
+La lógica vive en `src/lib/cumplimiento.ts`, es pura (recibe la fecha "hoy"
+por parámetro) y está cubierta por `src/lib/cumplimiento.test.ts`.
 
 ## Autenticación y roles (sección 3 de la especificación)
 
