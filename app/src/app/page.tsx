@@ -54,6 +54,12 @@ export default async function Home() {
           </Link>
         ))}
       </div>
+
+      {!esBordo && (
+        <Link href="/admin" className="text-sm text-blue-700 underline">
+          Administración — tripulación, catálogos y usuarios
+        </Link>
+      )}
     </main>
   );
 }

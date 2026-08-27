@@ -178,3 +178,78 @@ export const crearBoteRescateSchema = z
   });
 
 export const editarBoteRescateSchema = crearBoteRescateSchema;
+
+// ---------------------------------------------------------------------------
+// Administración (sección 3 de la especificación)
+// ---------------------------------------------------------------------------
+
+/** Un PIN de 4-8 dígitos: lo que se puede teclear rápido en cubierta. */
+const pinSchema = z
+  .string()
+  .regex(/^\d{4,8}$/, "El PIN debe tener entre 4 y 8 dígitos");
+
+export const crearTripulanteSchema = z.object({
+  apellidoNombre: z.string().min(1, "Falta el apellido y nombre"),
+  dni: z.string().regex(/^\d{7,9}$/, "DNI inválido"),
+  puesto: z.string().min(1, "Falta el puesto"),
+  pin: pinSchema.optional().nullable(),
+});
+
+export const editarTripulanteSchema = z.object({
+  apellidoNombre: z.string().min(1).optional(),
+  puesto: z.string().min(1).optional(),
+  activo: z.boolean().optional(),
+  /** Sólo si se quiere reasignar el PIN; omitirlo lo deja como está. */
+  pin: pinSchema.optional().nullable(),
+});
+
+export const crearTipoZafarranchoSchema = z.object({
+  codigo: z
+    .string()
+    .regex(/^[a-z0-9_]+$/, "Usá minúsculas, números y guión bajo (ej. hombre_al_agua)"),
+  nombre: z.string().min(1, "Falta el nombre"),
+  periodicidadDias: z.number().int().positive("La periodicidad debe ser mayor a cero"),
+});
+
+export const editarTipoZafarranchoSchema = z.object({
+  nombre: z.string().min(1).optional(),
+  periodicidadDias: z.number().int().positive().optional(),
+  activo: z.boolean().optional(),
+});
+
+export const crearChecklistItemSchema = z.object({
+  tipo: z.string().min(1, "Falta el grupo del checklist"),
+  item: z.string().min(1, "Falta la descripción del ítem"),
+  cantidadEsperada: z.number().int().positive().optional().nullable(),
+  orden: z.number().int().nonnegative().optional(),
+});
+
+export const editarChecklistItemSchema = z.object({
+  item: z.string().min(1).optional(),
+  cantidadEsperada: z.number().int().positive().optional().nullable(),
+  orden: z.number().int().nonnegative().optional(),
+  activo: z.boolean().optional(),
+});
+
+const passwordSchema = z.string().min(8, "La contraseña debe tener al menos 8 caracteres");
+
+export const crearUsuarioSchema = z.object({
+  email: z.email("Email inválido"),
+  nombre: z.string().min(1, "Falta el nombre"),
+  rol: z.enum(["bordo", "tierra"]),
+  password: passwordSchema,
+  tripulanteId: z.string().optional().nullable(),
+});
+
+export const editarUsuarioSchema = z.object({
+  nombre: z.string().min(1).optional(),
+  rol: z.enum(["bordo", "tierra"]).optional(),
+  activo: z.boolean().optional(),
+  password: passwordSchema.optional(),
+  tripulanteId: z.string().optional().nullable(),
+});
+
+export const cambiarPasswordSchema = z.object({
+  passwordActual: z.string().min(1, "Ingresá tu contraseña actual"),
+  passwordNueva: passwordSchema,
+});

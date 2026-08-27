@@ -112,7 +112,7 @@ los que define la especificación:
 | Rol | Puede |
 |---|---|
 | `bordo` | Cargar registros, firmar, corregir los observados |
-| `tierra` | Revisar: aprobar u observar |
+| `tierra` | Revisar (aprobar u observar) y administrar (`/admin`) |
 
 El control es **en capas**, y la capa que importa es la del servidor:
 
@@ -139,9 +139,8 @@ legible aunque después el usuario cambie de nombre o se dé de baja.
   intentos fallidos y 15 minutos de bloqueo. Alcanza para un despliegue de un
   solo proceso, pero se pierde al reiniciar y no se comparte entre réplicas —
   al escalar hay que moverlo a la base o a Redis.
-- **Falta gestión de usuarios**: se crean por seed. Tampoco hay recuperación
-  de contraseña ni rotación de PIN — eso llega con la pantalla de
-  administración (próximo paso 2).
+- **No hay recuperación de contraseña por email.** Si alguien la olvida, la
+  restablece un usuario de tierra desde `/admin/usuarios`.
 
 ### Decisión de diseño no explícita en la especificación
 
@@ -151,6 +150,38 @@ La especificación (sección 5.3) no define una tabla de revisión para
 ella, cada nueva revisión pisaría el comentario/decisión anterior — y la
 sección 2.5 exige trazabilidad completa de "el historial de idas y vueltas si
 hubo observaciones". Queda documentado en `prisma/schema.prisma`.
+
+## Administración (`/admin`)
+
+La especificación (sección 3) deja abierto si los catálogos los administra el
+asesor o hace falta un rol aparte. **Para este piloto los administra `tierra`
+directamente**: un tercer rol para un buque y dos usuarios es burocracia sin
+beneficio. Separarlo después es agregar el rol y cambiar dos condiciones
+(el layout de `/admin` y el `requireUsuario` de `/api/admin/*`).
+
+Tres pantallas:
+
+- **Tripulación** — alta, baja y asignación/rotación de PIN.
+- **Catálogos** — periodicidad y alta/baja de tipos de zafarrancho, e ítems
+  del checklist del bote. Es lo que cumple la promesa de "no hardcodear" de
+  la especificación: lo que se edita acá cambia los formularios de a bordo
+  sin tocar código.
+- **Usuarios** — alta, baja, restablecer contraseña de otro, y cambiar la
+  propia (pidiendo la actual).
+
+Dos decisiones que conviene conocer:
+
+- **Nada se borra, se da de baja.** Los registros firmados apuntan a
+  tripulantes, tipos de zafarrancho e ítems de checklist. Borrarlos rompería
+  la trazabilidad que exige la sección 2.5; `activo=false` los saca de los
+  formularios nuevos y deja el historial legible.
+- **No se puede dejar la plataforma sin administrador.** Dar de baja o
+  cambiarle el rol al último usuario de tierra activo devuelve 409: si no,
+  nadie podría volver a entrar a administrar.
+
+Cambiar una contraseña o dar de baja a un usuario cierra sus sesiones
+abiertas. El cambio de la contraseña propia conserva la sesión actual y
+cierra las demás.
 
 ## Reglas de negocio definidas fuera de la especificación
 
@@ -171,13 +202,8 @@ hubo observaciones". Queda documentado en `prisma/schema.prisma`.
      `registroPadreId` genérico previendo esos padres, y los ítems del
      Anexo A ya vienen en el seed. Falta la tabla de cabecera de PM-04, que
      la especificación todavía no define.
-2. **Pantalla de administración**: alta/baja de usuarios y tripulación,
-   cambio de contraseña y de PIN, y edición de los catálogos (tipos de
-   zafarrancho, ítems de checklist) — hoy todo eso sale del seed. La
-   especificación (sección 3) deja pendiente si lo maneja el asesor
-   directamente o hace falta un rol de administrador aparte; ésa es la
-   decisión a tomar antes de construirlo.
-4. **Migrar a Postgres** en cuanto haya un entorno de despliegue real.
-5. Ajustar el catálogo de referencia (`prisma/seed.ts`) con los datos reales
-   de Pesantar 1 cuando estén disponibles (REGINAVE actualizado, ordenanza
-   PNA vigente, exigencias por eslora +75 m).
+2. **Migrar a Postgres** en cuanto haya un entorno de despliegue real, y
+   mover a la base el rate limit del PIN (hoy en memoria del proceso).
+3. Ajustar el catálogo de referencia (ahora editable desde `/admin/catalogos`)
+   con los datos reales de Pesantar 1 cuando estén disponibles (REGINAVE
+   actualizado, ordenanza PNA vigente, exigencias por eslora +75 m).
