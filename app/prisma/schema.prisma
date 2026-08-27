@@ -1,0 +1,350 @@
+// Prisma schema — Plataforma SGS (MVP Pesantar, alcance PE-01)
+// Ver /docs/especificacion-plataforma-sgs.md para el contexto funcional completo.
+//
+// Nota de portabilidad: se usan campos String (no `enum`) para valores
+// categóricos porque el datasource de desarrollo es SQLite, que no soporta
+// enums nativos en Prisma. Los valores permitidos están documentados en
+// comentario junto a cada campo y se validan en la capa de API (zod).
+// Al migrar a Postgres (recomendado para producción) se pueden convertir a
+// `enum` de Prisma sin cambiar la forma de los datos.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// 5.1 Entidades base
+// ---------------------------------------------------------------------------
+
+model Buque {
+  id           String   @id @default(cuid())
+  nombre       String
+  matricula    String   @unique
+  esloraMetros Float    @map("eslora_metros")
+  estado       String   @default("en_construccion") // en_construccion | operativo | baja
+  fechaAlta    DateTime @default(now()) @map("fecha_alta")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tripulantes           Tripulante[]
+  procedimientos        ProcedimientoConfig[]
+  tiposZafarrancho      TipoZafarrancho[]
+  checklistConfigs      ChecklistConfig[]
+  zafarranchoEjercicios ZafarranchoEjercicio[]
+  registrosEmergencia   RegistroEmergencia[]
+  botesRescateControl   BoteRescateControl[]
+
+  @@map("buque")
+}
+
+model Tripulante {
+  id             String   @id @default(cuid())
+  buqueId        String   @map("buque_id")
+  apellidoNombre String   @map("apellido_nombre")
+  dni            String
+  puesto         String
+  activo         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  buque           Buque                     @relation(fields: [buqueId], references: [id])
+  participaciones ZafarranchoParticipante[]
+
+  @@unique([buqueId, dni])
+  @@map("tripulante")
+}
+
+// ---------------------------------------------------------------------------
+// 5.2 Catálogos configurables (editables por buque, no hardcodeados)
+// ---------------------------------------------------------------------------
+
+model ProcedimientoConfig {
+  id            String   @id @default(cuid())
+  buqueId       String   @map("buque_id")
+  codigo        String // "PE-01"
+  nombre        String
+  revision      String
+  fechaVigencia DateTime @map("fecha_vigencia")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  buque Buque @relation(fields: [buqueId], references: [id])
+
+  @@unique([buqueId, codigo, revision])
+  @@map("procedimiento_config")
+}
+
+model TipoZafarrancho {
+  id               String   @id @default(cuid())
+  buqueId          String   @map("buque_id")
+  codigo           String
+  nombre           String
+  periodicidadDias Int      @map("periodicidad_dias")
+  activo           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  buque      Buque                  @relation(fields: [buqueId], references: [id])
+  ejercicios ZafarranchoEjercicio[]
+
+  @@unique([buqueId, codigo])
+  @@map("tipo_zafarrancho")
+}
+
+model ChecklistConfig {
+  id               String   @id @default(cuid())
+  buqueId          String   @map("buque_id")
+  // bote_exterior | bote_interior | bote_pescante | bote_inventario | pm04_anexoA | pm04_anexoB | custom
+  tipo             String
+  item             String
+  cantidadEsperada Int?     @map("cantidad_esperada")
+  orden            Int
+  activo           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  buque     Buque               @relation(fields: [buqueId], references: [id])
+  registros ChecklistRegistro[]
+
+  @@unique([buqueId, tipo, item])
+  @@map("checklist_config")
+}
+
+// ---------------------------------------------------------------------------
+// 5.3 Ejercicio de zafarrancho (RE-01 A) — primer flujo end-to-end del MVP
+// ---------------------------------------------------------------------------
+
+model ZafarranchoEjercicio {
+  id                  String    @id @default(cuid())
+  buqueId             String    @map("buque_id")
+  tipoZafarranchoId   String    @map("tipo_zafarrancho_id")
+  marea               String?
+  singladura          String?
+  fecha               DateTime
+  hora                String // "HH:mm"
+  temasDesarrollados  String    @map("temas_desarrollados")
+  libroNavegacionFoja String?   @map("libro_navegacion_foja")
+  observaciones       String?
+  firmaCapitan        String?   @map("firma_capitan") // imagen de firma (data URL / storage key)
+  // borrador | pendiente_revision | aprobado | observado
+  estado              String    @default("borrador")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  submittedAt         DateTime? @map("submitted_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  buque           Buque                     @relation(fields: [buqueId], references: [id])
+  tipoZafarrancho TipoZafarrancho           @relation(fields: [tipoZafarranchoId], references: [id])
+  participantes   ZafarranchoParticipante[]
+  revisiones      ZafarranchoRevision[]
+
+  @@map("zafarrancho_ejercicio")
+}
+
+model ZafarranchoParticipante {
+  id           String  @id @default(cuid())
+  ejercicioId  String  @map("ejercicio_id")
+  tripulanteId String  @map("tripulante_id")
+  dni          String
+  puesto       String
+  firma        String? // imagen de firma (data URL / storage key)
+
+  ejercicio  ZafarranchoEjercicio @relation(fields: [ejercicioId], references: [id], onDelete: Cascade)
+  tripulante Tripulante           @relation(fields: [tripulanteId], references: [id])
+
+  @@map("zafarrancho_participante")
+}
+
+/// No está en la sección 5 de la especificación tal cual, pero es necesaria
+/// para cumplir el requisito no funcional de "historial de idas y vueltas si
+/// hubo observaciones" (sección 2.5): sin esta tabla, cada nueva revisión
+/// pisaría el comentario/decisión anterior en `zafarrancho_ejercicio`.
+model ZafarranchoRevision {
+  id          String   @id @default(cuid())
+  ejercicioId String   @map("ejercicio_id")
+  decision    String // aprobado | observado
+  comentario  String?
+  revisadoPor String   @map("revisado_por")
+  revisadoAt  DateTime @default(now()) @map("revisado_at")
+
+  ejercicio ZafarranchoEjercicio @relation(fields: [ejercicioId], references: [id], onDelete: Cascade)
+
+  @@map("zafarrancho_revision")
+}
+
+// ---------------------------------------------------------------------------
+// 5.4 Registros de emergencia (RE-01 B, C, D, E, R)
+// ---------------------------------------------------------------------------
+
+model RegistroEmergencia {
+  id                             String    @id @default(cuid())
+  buqueId                        String    @map("buque_id")
+  // sin_gobierno | colision | incendio | varadura | remolque
+  tipo                           String
+  marea                          String?
+  singladura                     String?
+  fecha                          DateTime
+  hora                           String
+  descripcion                    String
+  condicionesHidrometeorologicas String?   @map("condiciones_hidrometeorologicas")
+  seInformaCompania              Boolean   @default(false) @map("se_informa_compania")
+  seInformaPna                   Boolean   @default(false) @map("se_informa_pna")
+  huboHeridos                    Boolean   @default(false) @map("hubo_heridos")
+  necesitaRemolque               Boolean   @default(false) @map("necesita_remolque")
+  firmaCapitanPd                 String?   @map("firma_capitan_pd")
+  estado                         String    @default("borrador")
+  createdAt                      DateTime  @default(now()) @map("created_at")
+  submittedAt                    DateTime? @map("submitted_at")
+  updatedAt                      DateTime  @updatedAt @map("updated_at")
+
+  buque          Buque                        @relation(fields: [buqueId], references: [id])
+  extSinGobierno ExtSinGobierno?
+  extColision    ExtColision?
+  extIncendio    ExtIncendio?
+  extVaradura    ExtVaradura?
+  extRemolque    ExtRemolque?
+  revisiones     RegistroEmergenciaRevision[]
+
+  @@map("registro_emergencia")
+}
+
+model ExtSinGobierno {
+  id                        String    @id @default(cuid())
+  registroId                String    @unique @map("registro_id")
+  buqueRemolque             String?   @map("buque_remolque")
+  matriculaRemolque         String?   @map("matricula_remolque")
+  horaInicio                String?   @map("hora_inicio")
+  duracionEstimada          String?   @map("duracion_estimada")
+  fechaUltimoControlAnexoAb DateTime? @map("fecha_ultimo_control_anexo_ab")
+
+  registro RegistroEmergencia @relation(fields: [registroId], references: [id], onDelete: Cascade)
+
+  @@map("ext_sin_gobierno")
+}
+
+model ExtColision {
+  id                        String  @id @default(cuid())
+  registroId                String  @unique @map("registro_id")
+  lugar                     String?
+  detalleDanos              String? @map("detalle_danos")
+  verifIncendio             Boolean @default(false) @map("verif_incendio")
+  verifDerrame              Boolean @default(false) @map("verif_derrame")
+  estadoEstanqueidadTanques String? @map("estado_estanqueidad_tanques")
+
+  registro RegistroEmergencia @relation(fields: [registroId], references: [id], onDelete: Cascade)
+
+  @@map("ext_colision")
+}
+
+model ExtIncendio {
+  id                   String  @id @default(cuid())
+  registroId           String  @unique @map("registro_id")
+  lugarInicio          String? @map("lugar_inicio")
+  corteSuministro      Boolean @default(false) @map("corte_suministro")
+  cierreVentilacion    Boolean @default(false) @map("cierre_ventilacion")
+  puertasCortafuego    Boolean @default(false) @map("puertas_cortafuego")
+  puertasEstancas      Boolean @default(false) @map("puertas_estancas")
+  cumpleRolIncendio    Boolean @default(false) @map("cumple_rol_incendio")
+  usoEra               Boolean @default(false) @map("uso_era")
+  usoMangueras         Boolean @default(false) @map("uso_mangueras")
+  usoExtintores        Boolean @default(false) @map("uso_extintores")
+  usoCo2               Boolean @default(false) @map("uso_co2")
+  usoTrajeBombero      Boolean @default(false) @map("uso_traje_bombero")
+  verifPerdidaGobierno Boolean @default(false) @map("verif_perdida_gobierno")
+  verifDerrame         Boolean @default(false) @map("verif_derrame")
+
+  registro RegistroEmergencia @relation(fields: [registroId], references: [id], onDelete: Cascade)
+
+  @@map("ext_incendio")
+}
+
+model ExtVaradura {
+  id                       String  @id @default(cuid())
+  registroId               String  @unique @map("registro_id")
+  lugar                    String?
+  detalleDanos             String? @map("detalle_danos")
+  danosSolucionablesAbordo Boolean @default(false) @map("danos_solucionables_abordo")
+  detalleSolucion          String? @map("detalle_solucion")
+
+  registro RegistroEmergencia @relation(fields: [registroId], references: [id], onDelete: Cascade)
+
+  @@map("ext_varadura")
+}
+
+model ExtRemolque {
+  id                                String  @id @default(cuid())
+  registroId                        String  @unique @map("registro_id")
+  posicionGeografica                String? @map("posicion_geografica")
+  buqueRemolque                     String? @map("buque_remolque")
+  matriculaRemolque                 String? @map("matricula_remolque")
+  horaInicio                        String? @map("hora_inicio")
+  duracionEstimada                  String? @map("duracion_estimada")
+  verificacionesAntesDuranteDespues String? @map("verificaciones_antes_durante_despues")
+
+  registro RegistroEmergencia @relation(fields: [registroId], references: [id], onDelete: Cascade)
+
+  @@map("ext_remolque")
+}
+
+/// Mismo motivo que `ZafarranchoRevision`: historial de revisión en tierra.
+model RegistroEmergenciaRevision {
+  id          String   @id @default(cuid())
+  registroId  String   @map("registro_id")
+  decision    String // aprobado | observado
+  comentario  String?
+  revisadoPor String   @map("revisado_por")
+  revisadoAt  DateTime @default(now()) @map("revisado_at")
+
+  registro RegistroEmergencia @relation(fields: [registroId], references: [id], onDelete: Cascade)
+
+  @@map("registro_emergencia_revision")
+}
+
+// ---------------------------------------------------------------------------
+// 5.5 Checklists (RE-01 F, PM 04)
+// ---------------------------------------------------------------------------
+
+model BoteRescateControl {
+  id                String   @id @default(cuid())
+  buqueId           String   @map("buque_id")
+  marea             String?
+  singladura        String?
+  fechaHora         DateTime @map("fecha_hora")
+  ubicacionPosicion String?  @map("ubicacion_posicion")
+  observaciones     String?
+  firma             String?
+  estado            String   @default("borrador")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  buque              Buque               @relation(fields: [buqueId], references: [id])
+  checklistRegistros ChecklistRegistro[]
+
+  @@map("bote_rescate_control")
+}
+
+/// `registroPadreTipo`/`registroPadreId` quedan documentados para cuando se
+/// sumen los checklists de PM-04 Anexo A/B (fuera del primer POC), que en la
+/// especificación aún no tienen una tabla "cabecera" propia definida. Por
+/// ahora el único padre real modelado con FK tipada es `BoteRescateControl`.
+model ChecklistRegistro {
+  id                   String   @id @default(cuid())
+  checklistConfigId    String   @map("checklist_config_id")
+  registroPadreTipo    String   @map("registro_padre_tipo") // "bote_rescate_control" | futuro: "pm04_anexoA" | "pm04_anexoB"
+  registroPadreId      String   @map("registro_padre_id")
+  boteRescateControlId String?  @map("bote_rescate_control_id")
+  fecha                DateTime
+  estado               String // OK | NO_OK
+  observacion          String?
+  firma                String?
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  checklistConfig    ChecklistConfig     @relation(fields: [checklistConfigId], references: [id])
+  boteRescateControl BoteRescateControl? @relation(fields: [boteRescateControlId], references: [id], onDelete: Cascade)
+
+  @@map("checklist_registro")
+}
