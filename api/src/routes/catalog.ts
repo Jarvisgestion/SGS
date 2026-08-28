@@ -48,6 +48,17 @@ export async function catalogRoutes(app: FastifyInstance) {
     return rows[0];
   });
 
+  /** Nombres de los roles, para no mostrar el código crudo al firmar. */
+  app.get('/roles', async (req) => {
+    const { rows } = await app.db.query(
+      `SELECT code, name, is_shipboard FROM roles
+        WHERE company_id IS NULL OR company_id = $1
+        ORDER BY name`,
+      [req.companyId],
+    );
+    return { roles: rows };
+  });
+
   app.get('/vessels', async (req) => {
     const { rows } = await app.db.query(
       `SELECT id, name, matricula, vessel_type, service, specific_operation, status, specs

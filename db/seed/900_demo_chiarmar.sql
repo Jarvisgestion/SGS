@@ -61,7 +61,7 @@ VALUES
    {"key":"tipo","type":"select","label":"Tipo","options":["Buque motor","Buque pesquero","Remolcador"]},
    {"key":"ficha_tecnica","type":"table","label":"Ficha técnica",
     "columns":[{"key":"caracteristica","type":"text"},{"key":"valor","type":"text"}]},
-   {"key":"firma_pd","type":"signature_block","signer_role":"persona_designada"}]'::jsonb),
+   {"key":"firma_pd","type":"signature_block","label":"Firma de la Persona Designada","signer_role":"persona_designada"}]'::jsonb),
 
 -- ---------------------------------------------------------------- RE-01 A ---
 -- Zafarrancho de incendio: recurrencia fija de 30 días (los otros tipos de
@@ -74,7 +74,7 @@ VALUES
    {"key":"asistentes","type":"table","label":"Asistentes",
     "columns":[{"key":"nombre","type":"text"},{"key":"dni","type":"text"},{"key":"puesto","type":"text"}]},
    {"key":"observaciones","type":"textarea","label":"Observaciones"},
-   {"key":"firma_capitan","type":"signature_block","signer_role":"capitan"}]'::jsonb),
+   {"key":"firma_capitan","type":"signature_block","label":"Firma del Capitán","signer_role":"capitan"}]'::jsonb),
 
 -- ---------------------------------------------------------------- RO-07 A ---
 -- Se carga antes que RE-01D porque éste la referencia en triggers_record_type
@@ -88,8 +88,8 @@ VALUES
    {"key":"riesgo_asociado","type":"risk_reference","label":"Cuadro de la matriz de riesgo (PO-08)"},
    {"key":"medidas_correctivas","type":"table","label":"Plan de medidas correctivas",
     "columns":[{"key":"medida","type":"text"},{"key":"responsable","type":"text"},{"key":"plazo","type":"date"}]},
-   {"key":"firma_capitan","type":"signature_block","signer_role":"capitan"},
-   {"key":"firma_pd","type":"signature_block","signer_role":"persona_designada"}]'::jsonb),
+   {"key":"firma_capitan","type":"signature_block","label":"Firma del Capitán","signer_role":"capitan"},
+   {"key":"firma_pd","type":"signature_block","label":"Firma de la Persona Designada","signer_role":"persona_designada"}]'::jsonb),
 
 -- ----------------------------------------------------------------- RE-01R ---
 (pg_temp.proc('PE-01'), '11111111-1111-1111-1111-111111111111', 'RE-01R',
@@ -99,7 +99,7 @@ VALUES
    {"key":"posicion_lon","type":"text","label":"Longitud"},
    {"key":"buque_remolcador","type":"text","label":"Buque remolcador"},
    {"key":"descripcion","type":"textarea","label":"Descripción de la maniobra"},
-   {"key":"firma_capitan","type":"signature_block","signer_role":"capitan"}]'::jsonb),
+   {"key":"firma_capitan","type":"signature_block","label":"Firma del Capitán","signer_role":"capitan"}]'::jsonb),
 
 -- ----------------------------------------------------------------- RE-01D ---
 -- Patrón "un registro dispara otro": los booleanos marcados con
@@ -118,7 +118,7 @@ VALUES
    {"key":"informa_pna","type":"boolean","label":"Se informa a PNA"},
    {"key":"hubo_heridos","type":"boolean","label":"Hubo heridos","triggers_record_type":"RO-07A"},
    {"key":"necesita_remolque","type":"boolean","label":"Necesita remolque","triggers_record_type":"RE-01R"},
-   {"key":"firma_capitan","type":"signature_block","signer_role":"capitan"}]'::jsonb),
+   {"key":"firma_capitan","type":"signature_block","label":"Firma del Capitán","signer_role":"capitan"}]'::jsonb),
 
 -- ---------------------------------------------------------------- RO-03 A ---
 (pg_temp.proc('PO-03'), '11111111-1111-1111-1111-111111111111', 'RO-03A',
@@ -130,8 +130,8 @@ VALUES
     "options":["Políticas de la empresa","Organigrama y PD","Uso de EPP","Zafarranchos y puntos de reunión",
                "Chalecos y balsas salvavidas","Lucha contra incendio","Hombre al agua","Comunicaciones",
                "Reporte de no conformidades"]},
-   {"key":"firma_tripulante","type":"signature_block","signer_role":"tripulante"},
-   {"key":"firma_responsable","type":"signature_block","signer_role":"capitan"}]'::jsonb),
+   {"key":"firma_tripulante","type":"signature_block","label":"Firma del tripulante","signer_role":"tripulante"},
+   {"key":"firma_responsable","type":"signature_block","label":"Firma de quien familiarizó","signer_role":"capitan"}]'::jsonb),
 
 -- ---------------------------------------------------------------- RM-04 B ---
 -- Tabla de filas repetibles + tres firmas con roles distintos.
@@ -145,9 +145,9 @@ VALUES
                {"key":"urgencia","type":"select","options":["Normal","Urgente"]},
                {"key":"descripcion","type":"text"},
                {"key":"cantidad_recibida","type":"number"}]},
-   {"key":"firma_pedido","type":"signature_block","signer_role":"solicitante"},
-   {"key":"firma_recibido","type":"signature_block","signer_role":"recibe"},
-   {"key":"firma_conforme","type":"signature_block","signer_role":"conforme"}]'::jsonb),
+   {"key":"firma_pedido","type":"signature_block","label":"Pedido por","signer_role":"solicitante"},
+   {"key":"firma_recibido","type":"signature_block","label":"Recibido por","signer_role":"recibe"},
+   {"key":"firma_conforme","type":"signature_block","label":"Conforme","signer_role":"conforme"}]'::jsonb),
 
 -- ---------------------------------------------------------------- RO-05 C ---
 (pg_temp.proc('PO-05'), '11111111-1111-1111-1111-111111111111', 'RO-05C',
@@ -161,7 +161,7 @@ VALUES
                "Elementos de salvamento en posición","Extintores en posición y con carga","Escotillas y portas estancas",
                "Carga estibada y trincada","Despacho de PNA","Plan de navegación informado"],"required":true},
    {"key":"observaciones","type":"textarea","label":"Observaciones"},
-   {"key":"firma_capitan","type":"signature_block","signer_role":"capitan"}]'::jsonb),
+   {"key":"firma_capitan","type":"signature_block","label":"Firma del Capitán","signer_role":"capitan"}]'::jsonb),
 
 -- ------------------------------------------------------------- RA-06 NNC ---
 -- Emisores restringidos: la NNC sólo la pueden emitir estos roles.
@@ -175,7 +175,7 @@ VALUES
    {"key":"descripcion","type":"textarea","label":"Descripción de la no conformidad","required":true},
    {"key":"accion_propuesta","type":"textarea","label":"Acción correctiva propuesta"},
    {"key":"plazo","type":"date","label":"Plazo de resolución"},
-   {"key":"firma_emisor","type":"signature_block","signer_role":"auditor"}]'::jsonb),
+   {"key":"firma_emisor","type":"signature_block","label":"Firma de quien emite","signer_role":"auditor"}]'::jsonb),
 
 -- ---------------------------------------------------------------- RO-10 C ---
 -- Checklist diario mientras el buque está retirado de servicio.
@@ -187,5 +187,5 @@ VALUES
                "Extintores en posición","Accesos cerrados y señalizados","Sin presencia de personas no autorizadas"],
     "required":true},
    {"key":"novedades","type":"textarea","label":"Novedades"},
-   {"key":"firma_guardia","type":"signature_block","signer_role":"guardia_puerto"}]'::jsonb)
+   {"key":"firma_guardia","type":"signature_block","label":"Firma del guardia","signer_role":"guardia_puerto"}]'::jsonb)
 ON CONFLICT DO NOTHING;

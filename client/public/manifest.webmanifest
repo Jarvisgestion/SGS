@@ -1,0 +1,9 @@
+{
+  "name": "SGS a bordo",
+  "short_name": "SGS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f2b46",
+  "theme_color": "#0f2b46",
+  "icons": []
+}

@@ -13,7 +13,8 @@ empresa.
 | Modelo de datos genérico | `docs/02-modelo-de-datos.md` | Hecho |
 | Esquema PostgreSQL + migraciones | `db/`, `docs/03-esquema-sql.md` | Hecho, con aserciones |
 | API HTTP | `api/` | Ciclo de registro completo; ABM de catálogo pendiente |
-| Cliente a bordo | — | Pendiente |
+| Cliente a bordo y de tierra | `client/` | Carga sin señal, firma, revisión y tablero |
+| Prueba del circuito completo | `e2e/` | En navegador real, sobre la base real |
 | Catálogo real de Xeitosiño / Pesantar | — | Pendiente del relevamiento |
 
 ## Puesta en marcha
@@ -24,14 +25,24 @@ PGDATABASE=sgs_dev ./scripts/db-apply.sh --with-seed
 
 cd api && npm install && cp .env.example .env   # completar SGS_SESSION_SECRET
 npm start
+
+cd ../client && npm install && npm run dev      # http://localhost:5173
 ```
 
 ## Verificación
 
 ```bash
-./scripts/db-test.sh     # aserciones del esquema sobre una base descartable
-cd api && npm test       # ciclo completo del registro contra la base real
+./scripts/db-test.sh          # aserciones del esquema sobre una base descartable
+cd api    && npm test         # ciclo del registro contra la base real
+cd client && npm test         # formularios dinámicos y sincronización
+cd e2e    && npm test         # circuito completo en un navegador real
 ```
+
+`e2e/` levanta la base, la API y la app, y recorre el circuito entero: el
+capitán carga un incendio, lo firma con trazo y PIN, lo envía; tierra lo
+observa; vuelve a bordo con la observación; se corrige, se reenvía y se aprueba.
+También verifica que el formulario se pueda completar sin señal y que el
+borrador sobreviva a reabrir la app.
 
 ## Criterio de diseño
 
