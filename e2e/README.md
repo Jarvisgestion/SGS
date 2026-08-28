@@ -18,6 +18,11 @@ Qué cubre:
   el service worker: se abre un formulario nuevo fuera de cobertura, se
   completa, se reabre la app todavía sin señal y el borrador sigue ahí; al
   volver la conexión se sube solo.
+- **`catalogo.spec.ts`** — la tesis del proyecto: la Persona Designada crea un
+  procedimiento y un formulario nuevos desde la pantalla (con campo obligatorio,
+  lista de opciones y bloque de firma), y el capitán lo carga y lo firma a
+  bordo, sin que cambie una línea de código. Después verifica que editar el
+  formulario suba la versión sin alterar lo ya cargado.
 - **Tablero** — cumplimiento (RA-06C) y certificados vencidos.
 - **`capturas.spec.ts`** — no verifica nada: genera las imágenes de `capturas/`.
 

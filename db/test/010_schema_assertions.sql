@@ -310,6 +310,40 @@ BEGIN
     'ya fue aprobado', 'un registro aprobado no admite nuevas revisiones');
 END $$;
 
+\echo '  - permiso para editar el catálogo'
+DO $$
+DECLARE
+  cid uuid := '11111111-1111-1111-1111-111111111111';
+  cap uuid; pd uuid; proc uuid;
+BEGIN
+  SELECT id INTO cap FROM users WHERE full_name = 'Capitán Entrante';
+  SELECT id INTO pd  FROM users WHERE full_name = 'Persona Designada';
+  SELECT id INTO proc FROM procedures WHERE code = 'PO-05';
+
+  -- sin actor declarado (seeds, migraciones) no se verifica nada
+  PERFORM set_config('sgs.actor_user_id', '', true);
+  INSERT INTO record_types (procedure_id, company_id, code, name, category)
+  VALUES (proc, cid, 'RO-05Z', 'Alta sin actor', 'scheduled_checklist');
+
+  -- el capitán no administra el catálogo
+  PERFORM set_config('sgs.actor_user_id', cap::text, true);
+  PERFORM pg_temp.assert_fails(
+    format($f$INSERT INTO record_types (procedure_id, company_id, code, name, category)
+              VALUES (%L, %L, 'RO-05X', 'No debería', 'scheduled_checklist')$f$, proc, cid),
+    'rol habilitado para editar', 'el capitán no puede crear tipos de registro');
+
+  -- la Persona Designada sí
+  PERFORM set_config('sgs.actor_user_id', pd::text, true);
+  INSERT INTO record_types (procedure_id, company_id, code, name, category)
+  VALUES (proc, cid, 'RO-05Y', 'Alta por la PD', 'scheduled_checklist');
+  PERFORM pg_temp.assert(
+    (SELECT count(*) FROM record_types WHERE code = 'RO-05Y') = 1,
+    'la PD puede crear tipos de registro');
+
+  PERFORM set_config('sgs.actor_user_id', '', true);
+  DELETE FROM record_types WHERE code IN ('RO-05Y', 'RO-05Z');
+END $$;
+
 \echo '  - aislamiento multi-empresa'
 DO $$
 DECLARE

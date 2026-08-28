@@ -43,6 +43,21 @@ un rol habilitado para emitir RE-01D") y el cliente lo muestra sin reinterpretar
 La validación local es sólo para no hacer viajar un formulario que ya se sabe
 incompleto.
 
+## La empresa edita su propio manual
+
+Con un rol habilitado (`roles.can_manage_catalog`: armador, Persona Designada,
+asesor externo) aparece la solapa **Catálogo**:
+
+- **Manual** — revisiones del MGS y sus procedimientos. Poner una revisión en
+  vigencia deja la anterior superada, y sus formularios dejan de ofrecerse a
+  bordo; los registros ya cargados se siguen leyendo con el suyo.
+- **Formularios** — el editor de campos: se agregan, se ordenan y se configuran
+  los quince tipos de campo del esquema, con **vista previa** de cómo lo va a
+  ver la tripulación. Guardar sube la versión del formulario y congela la
+  anterior.
+- **Flota** y **Personas** — buques, altas de personal, asignación y cierre de
+  roles (que es como se documenta un cambio de mando).
+
 ## Decisiones que conviene conocer
 
 - **Los booleanos arrancan sin contestar**, no en "No". Un registro no puede
@@ -69,3 +84,5 @@ incompleto.
 4. **Elegir buque cuando la persona tiene rol en varios** está resuelto con un
    desplegable; falta el caso del asesor externo que opera varias empresas
    (la API ya lo soporta con `X-Company-Id`).
+5. **Duplicar una revisión del manual** para no arrancar de cero al crear la
+   siguiente.

@@ -65,6 +65,8 @@ export interface CurrentUser {
   /** Empresas sobre las que puede operar (la propia + las de sus roles vigentes). */
   companies: string[];
   roles: { code: string; companyId: string; vesselId: string | null }[];
+  /** Alguno de sus roles vigentes habilita a editar el catálogo. */
+  canManageCatalog: boolean;
 }
 
 export async function loadUser(db: Db, userId: string): Promise<CurrentUser> {
@@ -73,13 +75,17 @@ export async function loadUser(db: Db, userId: string): Promise<CurrentUser> {
     full_name: string;
     company_id: string | null;
     status: string;
-    roles: { code: string; company_id: string; vessel_id: string | null }[] | null;
+    roles:
+      | { code: string; company_id: string; vessel_id: string | null; can_manage_catalog: boolean }[]
+      | null;
   }>(
     `SELECT u.id, u.full_name, u.company_id, u.status,
             (SELECT json_agg(json_build_object('code', ur.role_code,
                                                'company_id', ur.company_id,
-                                               'vessel_id', ur.vessel_id))
+                                               'vessel_id', ur.vessel_id,
+                                               'can_manage_catalog', r.can_manage_catalog))
                FROM user_roles ur
+               JOIN roles r ON r.code = ur.role_code
               WHERE ur.user_id = u.id
                 AND ur.valid_from <= current_date
                 AND (ur.valid_to IS NULL OR ur.valid_to >= current_date)) AS roles
@@ -101,5 +107,12 @@ export async function loadUser(db: Db, userId: string): Promise<CurrentUser> {
     (c): c is string => c !== null,
   );
 
-  return { id: row.id, fullName: row.full_name, companyId: row.company_id, companies, roles };
+  return {
+    id: row.id,
+    fullName: row.full_name,
+    companyId: row.company_id,
+    companies,
+    roles,
+    canManageCatalog: (row.roles ?? []).some((r) => r.can_manage_catalog),
+  };
 }

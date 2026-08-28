@@ -6,10 +6,19 @@ const listQuery = z.object({
   scope: z.enum(['company', 'vessel']).optional(),
   category: z.string().optional(),
   include_derogados: z.coerce.boolean().default(false),
+  /** Para la pantalla de administración: también los de revisiones superadas. */
+  todas_las_revisiones: z.coerce.boolean().default(false),
 });
 
 export async function catalogRoutes(app: FastifyInstance) {
-  /** Catálogo de tipos de registro de la empresa: lo que la app ofrece cargar. */
+  /**
+   * Catálogo de tipos de registro: lo que la app ofrece cargar hoy.
+   *
+   * Sólo los de la revisión vigente del manual. Al poner en vigencia una
+   * revisión nueva, los formularios de la anterior dejan de ofrecerse — que es
+   * lo que significa superar una revisión. Los registros ya cargados se siguen
+   * leyendo con su formulario congelado.
+   */
   app.get('/record-types', async (req) => {
     const q = listQuery.parse(req.query);
 
@@ -17,15 +26,24 @@ export async function catalogRoutes(app: FastifyInstance) {
       `SELECT rt.id, rt.code, rt.name, rt.category, rt.scope, rt.version,
               rt.recurrence_type, rt.recurrence_days, rt.signature_requirement,
               rt.allowed_creator_roles, rt.allowed_reviewer_roles, rt.status,
-              p.code AS procedure_code, p.name AS procedure_name
+              p.code AS procedure_code, p.name AS procedure_name,
+              mv.revision_number, mv.status AS manual_status
          FROM record_types rt
          JOIN procedures p ON p.id = rt.procedure_id
+         JOIN manual_versions mv ON mv.id = p.manual_version_id
         WHERE rt.company_id = $1
           AND ($2::boolean OR rt.status = 'vigente')
+          AND ($5::boolean OR mv.status = 'vigente')
           AND ($3::record_scope IS NULL OR rt.scope = $3)
           AND ($4::record_category IS NULL OR rt.category = $4)
         ORDER BY p.sort_order, p.code, rt.code`,
-      [req.companyId, q.include_derogados, q.scope ?? null, q.category ?? null],
+      [
+        req.companyId,
+        q.include_derogados,
+        q.scope ?? null,
+        q.category ?? null,
+        q.todas_las_revisiones,
+      ],
     );
     return { record_types: rows };
   });

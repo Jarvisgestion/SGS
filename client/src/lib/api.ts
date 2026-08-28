@@ -33,6 +33,7 @@ export interface Session {
     full_name: string;
     companies: string[];
     roles: { code: string; companyId: string; vesselId: string | null }[];
+    can_manage_catalog: boolean;
   };
 }
 
@@ -95,7 +96,11 @@ export interface RecordTypeSummary {
   scope: 'company' | 'vessel';
   version: number;
   recurrence_type: string;
+  recurrence_days: number | null;
+  allowed_creator_roles: string[];
+  allowed_reviewer_roles: string[];
   signature_requirement: SignatureRequirement;
+  status: 'vigente' | 'derogado';
   procedure_code: string;
   procedure_name: string;
 }
@@ -114,6 +119,54 @@ export interface RecordTypeDetail extends RecordTypeSummary {
 export interface Rol {
   code: string;
   name: string;
+  is_shipboard: boolean;
+}
+
+// --- administración del catálogo -----------------------------------------
+
+export interface ManualVersion {
+  id: string;
+  revision_number: string;
+  regulation: string | null;
+  effective_date: string | null;
+  status: 'borrador' | 'vigente' | 'superada';
+  procedimientos: string;
+}
+
+export interface Procedure {
+  id: string;
+  manual_version_id: string;
+  code: string;
+  name: string;
+  sort_order: number;
+  status: string;
+  registros: string;
+}
+
+export interface UsuarioAdmin {
+  id: string;
+  full_name: string;
+  email: string | null;
+  dni: string | null;
+  status: string;
+  tiene_clave: boolean;
+  tiene_pin: boolean;
+  roles: { id: string; role_code: string; vessel_id: string | null; valid_from: string }[] | null;
+}
+
+export interface RecordTypeInput {
+  procedure_id?: string;
+  code?: string;
+  name?: string;
+  category?: string;
+  scope?: 'company' | 'vessel';
+  recurrence_type?: string;
+  recurrence_days?: number | null;
+  allowed_creator_roles?: string[];
+  allowed_reviewer_roles?: string[];
+  signature_requirement?: SignatureRequirement;
+  field_schema?: Field[];
+  status?: 'vigente' | 'derogado';
 }
 
 export interface Vessel {
@@ -159,8 +212,11 @@ export const api = {
   login: (email: string, password: string) =>
     request<Session>('POST', '/auth/login', { email, password }),
 
-  recordTypes: () =>
-    request<{ record_types: RecordTypeSummary[] }>('GET', '/catalog/record-types'),
+  recordTypes: (todasLasRevisiones = false) =>
+    request<{ record_types: RecordTypeSummary[] }>(
+      'GET',
+      `/catalog/record-types?todas_las_revisiones=${todasLasRevisiones}`,
+    ),
 
   recordType: (id: string) => request<RecordTypeDetail>('GET', `/catalog/record-types/${id}`),
 
@@ -220,6 +276,66 @@ export const api = {
     ),
 
   certificates: () => request<{ certificates: CertificateRow[] }>('GET', '/dashboard/certificates'),
+};
+
+export const admin = {
+  /** Para administrar hacen falta también los de revisiones superadas. */
+  tiposRegistro: () =>
+    request<{ record_types: RecordTypeSummary[] }>(
+      'GET',
+      '/catalog/record-types?todas_las_revisiones=true&include_derogados=true',
+    ),
+
+  manualVersions: () =>
+    request<{ manual_versions: ManualVersion[] }>('GET', '/admin/manual-versions'),
+
+  crearManual: (body: { revision_number: string; regulation?: string; effective_date?: string }) =>
+    request<ManualVersion>('POST', '/admin/manual-versions', body),
+
+  publicarManual: (id: string) =>
+    request<ManualVersion>('POST', `/admin/manual-versions/${id}/publicar`),
+
+  procedures: (manualVersionId?: string) =>
+    request<{ procedures: Procedure[] }>(
+      'GET',
+      `/admin/procedures${manualVersionId ? `?manual_version_id=${manualVersionId}` : ''}`,
+    ),
+
+  crearProcedimiento: (body: {
+    manual_version_id: string;
+    code: string;
+    name: string;
+    sort_order?: number;
+  }) => request<Procedure>('POST', '/admin/procedures', body),
+
+  crearTipoRegistro: (body: RecordTypeInput) =>
+    request<{ id: string }>('POST', '/admin/record-types', body),
+
+  editarTipoRegistro: (id: string, body: RecordTypeInput) =>
+    request<{ id: string; version: number }>('PATCH', `/admin/record-types/${id}`, body),
+
+  crearBuque: (body: Record<string, unknown>) => request<Vessel>('POST', '/admin/vessels', body),
+
+  editarBuque: (id: string, body: Record<string, unknown>) =>
+    request<Vessel>('PATCH', `/admin/vessels/${id}`, body),
+
+  usuarios: () => request<{ users: UsuarioAdmin[] }>('GET', '/admin/users'),
+
+  crearUsuario: (body: {
+    full_name: string;
+    email?: string;
+    dni?: string;
+    password?: string;
+    pin?: string;
+    role_code?: string;
+    vessel_id?: string | null;
+  }) => request<UsuarioAdmin>('POST', '/admin/users', body),
+
+  asignarRol: (userId: string, body: { role_code: string; vessel_id?: string | null }) =>
+    request<{ id: string }>('POST', `/admin/users/${userId}/roles`, body),
+
+  cerrarRol: (userId: string, roleId: string) =>
+    request<{ id: string }>('DELETE', `/admin/users/${userId}/roles/${roleId}`),
 };
 
 export interface ComplianceRow {

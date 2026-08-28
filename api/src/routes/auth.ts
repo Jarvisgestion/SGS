@@ -33,6 +33,7 @@ export async function authRoutes(app: FastifyInstance) {
         full_name: user.fullName,
         companies: user.companies,
         roles: user.roles,
+        can_manage_catalog: user.canManageCatalog,
       },
     };
   });

@@ -4,6 +4,7 @@ import { loadUser, verifyToken, type CurrentUser } from './auth.ts';
 import type { Config } from './config.ts';
 import { createPool, type Db } from './db.ts';
 import { HttpError, toHttpError } from './errors.ts';
+import { adminRoutes } from './routes/admin.ts';
 import { authRoutes } from './routes/auth.ts';
 import { catalogRoutes } from './routes/catalog.ts';
 import { dashboardRoutes } from './routes/dashboard.ts';
@@ -68,6 +69,7 @@ export function buildApp({ config, db, logger = false }: AppOptions): FastifyIns
     secured.register(catalogRoutes, { prefix: '/catalog' });
     secured.register(recordRoutes, { prefix: '/records' });
     secured.register(dashboardRoutes, { prefix: '/dashboard' });
+    secured.register(adminRoutes, { prefix: '/admin' });
   });
 
   return app;

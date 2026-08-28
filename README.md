@@ -12,8 +12,8 @@ empresa.
 | Relevamiento de un MGS real (Chiarmar) | `docs/01-catalogo-registros-chiarmar.md` | Hecho |
 | Modelo de datos genérico | `docs/02-modelo-de-datos.md` | Hecho |
 | Esquema PostgreSQL + migraciones | `db/`, `docs/03-esquema-sql.md` | Hecho, con aserciones |
-| API HTTP | `api/` | Ciclo de registro completo; ABM de catálogo pendiente |
-| Cliente a bordo y de tierra | `client/` | Carga sin señal, firma, revisión y tablero |
+| API HTTP | `api/` | Ciclo de registro y ABM del catálogo |
+| Cliente a bordo y de tierra | `client/` | Carga sin señal, firma, revisión, tablero y edición del manual |
 | Prueba del circuito completo | `e2e/` | En navegador real, sobre la base real |
 | Catálogo real de Xeitosiño / Pesantar | — | Pendiente del relevamiento |
 
@@ -82,6 +82,9 @@ sólo lectura, y firmas y revisiones que no se pueden borrar. El detalle está e
 `docs/03-esquema-sql.md`.
 
 Nada del dominio de una empresa concreta está en el código: los procedimientos
-y formularios son datos. El catálogo de Chiarmar que trae el seed es una
-demostración para probar que el esquema aguanta los formularios difíciles — no
-es el catálogo de ningún cliente.
+y formularios son datos, y se editan desde la propia plataforma. Hay una prueba
+de punta a punta que lo demuestra: la Persona Designada crea un formulario nuevo
+desde la pantalla y el capitán lo carga a bordo, sin que cambie una línea de
+código. El catálogo de Chiarmar que trae el seed es una demostración para probar
+que el esquema aguanta los formularios difíciles — no es el catálogo de ningún
+cliente.

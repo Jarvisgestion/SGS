@@ -10,6 +10,8 @@ import { Inicio } from './screens/Inicio.tsx';
 import { Formulario } from './screens/Formulario.tsx';
 import { Registro } from './screens/Registro.tsx';
 import { Bandeja, Tablero } from './screens/Tierra.tsx';
+import { Catalogo } from './screens/Catalogo.tsx';
+import { EditorFormulario } from './screens/EditorFormulario.tsx';
 
 export interface Contexto {
   session: Session;
@@ -18,6 +20,7 @@ export interface Contexto {
   roles: Rol[];
   borradores: Draft[];
   recargarBorradores(): Promise<void>;
+  refrescarCatalogo(): Promise<void>;
   sincronizar(): Promise<void>;
   enLinea: boolean;
 }
@@ -38,8 +41,28 @@ export function App() {
 
   /**
    * El catálogo se guarda en IndexedDB apenas se baja: es lo que permite abrir
-   * un formulario nuevo estando sin señal.
+   * un formulario nuevo estando sin señal. También se vuelve a llamar cuando se
+   * edita el catálogo desde la administración.
    */
+  const refrescarCatalogo = useCallback(async () => {
+    try {
+      const [tipos, buques, rolesApi] = await Promise.all([
+        api.recordTypes(),
+        api.vessels(),
+        api.roles(),
+      ]);
+      setRecordTypes(tipos.record_types);
+      setVessels(buques.vessels);
+      setRoles(rolesApi.roles);
+      await cache.set('record_types', tipos.record_types);
+      await cache.set('vessels', buques.vessels);
+      await cache.set('roles', rolesApi.roles);
+      await precargarFormularios(tipos.record_types);
+    } catch (err) {
+      if (!(err instanceof OfflineError)) console.warn('no se pudo refrescar el catálogo', err);
+    }
+  }, []);
+
   useEffect(() => {
     if (!session) return;
     void (async () => {
@@ -51,26 +74,10 @@ export function App() {
       if (tiposCache) setRecordTypes(tiposCache);
       if (buquesCache) setVessels(buquesCache);
       if (rolesCache) setRoles(rolesCache);
-
-      try {
-        const [tipos, buques, rolesApi] = await Promise.all([
-          api.recordTypes(),
-          api.vessels(),
-          api.roles(),
-        ]);
-        setRecordTypes(tipos.record_types);
-        setVessels(buques.vessels);
-        setRoles(rolesApi.roles);
-        await cache.set('record_types', tipos.record_types);
-        await cache.set('vessels', buques.vessels);
-        await cache.set('roles', rolesApi.roles);
-        await precargarFormularios(tipos.record_types);
-      } catch (err) {
-        if (!(err instanceof OfflineError)) console.warn('no se pudo refrescar el catálogo', err);
-      }
+      await refrescarCatalogo();
     })();
     void recargarBorradores();
-  }, [session, recargarBorradores]);
+  }, [session, recargarBorradores, refrescarCatalogo]);
 
   const sincronizar = useCallback(async () => {
     const pendientes = (await drafts.all()).filter((d) => d.dirty);
@@ -123,6 +130,7 @@ export function App() {
     roles,
     borradores,
     recargarBorradores,
+    refrescarCatalogo,
     sincronizar,
     enLinea,
   };
@@ -160,6 +168,11 @@ export function App() {
               Cumplimiento
             </a>
           </>
+        )}
+        {session.user.can_manage_catalog && (
+          <a href="#/admin" className={ruta[0] === 'admin' ? 'activo' : ''}>
+            Catálogo
+          </a>
         )}
       </nav>
 
@@ -200,6 +213,13 @@ function Pantalla({ ruta, ctx }: { ruta: string[]; ctx: Contexto }) {
       return <Bandeja ctx={ctx} />;
     case 'tablero':
       return <Tablero />;
+    case 'admin':
+      if (!ctx.session.user.can_manage_catalog) {
+        return <p className="vacio">Tu rol no habilita a editar el catálogo.</p>;
+      }
+      if (parametro === 'formulario') return <EditorFormulario ctx={ctx} recordTypeId={ruta[2]!} />;
+      if (parametro === 'nuevo-formulario') return <EditorFormulario ctx={ctx} procedureId={ruta[2]!} />;
+      return <Catalogo ctx={ctx} />;
     default:
       return <p className="vacio">No encontramos esa pantalla.</p>;
   }

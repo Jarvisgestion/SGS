@@ -61,6 +61,13 @@ npm run typecheck
 | `GET` | `/dashboard/pending-reviews` | Bandeja de revisión |
 | `GET` | `/dashboard/certificates` | RMGS-05: vencimientos |
 | `GET` | `/dashboard/nonconformities` | Desvíos de checklist |
+| `GET/POST` | `/admin/manual-versions` | Revisiones del MGS |
+| `POST` | `/admin/manual-versions/:id/publicar` | Poner una revisión en vigencia |
+| `GET/POST/PATCH` | `/admin/procedures` | Procedimientos del manual |
+| `POST/PATCH` | `/admin/record-types` | Alta y edición de formularios |
+| `POST/PATCH` | `/admin/vessels` | Flota |
+| `GET/POST/PATCH` | `/admin/users` | Personas |
+| `POST/DELETE` | `/admin/users/:id/roles` | Asignar y cerrar roles |
 
 ## Cómo está armada
 
@@ -69,6 +76,10 @@ npm run typecheck
   editar — todo eso lo rechaza la base. `src/errors.ts` traduce el SQLSTATE a
   un HTTP con el mensaje de la base, que ya está escrito para que lo lea una
   persona. La API valida forma (zod) y orquesta; no duplica criterios.
+- **Quién puede editar el catálogo lo decide la base.** Las rutas `/admin`
+  cortan antes para dar un error claro, pero el permiso está en un trigger
+  (`roles.can_manage_catalog`, migración 0009): escribir por SQL con un usuario
+  sin ese rol también falla.
 - **La empresa se resuelve del token, nunca del body.** Un tripulante tiene una
   sola; un asesor externo elige con la cabecera `X-Company-Id` entre las que sus
   roles vigentes le habilitan.
@@ -89,10 +100,9 @@ npm run typecheck
 2. **Subida de archivos.** `POST /records/:id/attachments` registra la
    referencia, no recibe el archivo. Falta elegir el almacenamiento (S3
    compatible) y firmar URLs de subida.
-3. **ABM de catálogo y de maestros.** Hoy la API es de lectura sobre el
-   catálogo: crear procedimientos, tipos de registro, buques y usuarios se hace
-   por SQL. Es lo próximo si se quiere que la empresa edite su manual desde la
-   plataforma.
+3. **Copiar una revisión del manual.** Al crear la Rev. 05 se arranca de cero:
+   falta poder duplicar los procedimientos y formularios de la revisión anterior
+   como punto de partida, que es como se trabaja en la práctica.
 4. **Paginado por cursor** en `/records` si el volumen lo pide; hoy es
    `limit`/`offset`.
 5. **Rate limiting en `/auth/login`.**
