@@ -1,3 +1,6 @@
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
+import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';
 import { loadUser, verifyToken, type CurrentUser } from './auth.ts';
@@ -28,8 +31,8 @@ export interface AppOptions {
   logger?: boolean;
 }
 
-export function buildApp({ config, db, logger = false }: AppOptions): FastifyInstance {
-  const app = Fastify({ logger, bodyLimit: 2 * 1024 * 1024 });
+export async function buildApp({ config, db, logger = false }: AppOptions): Promise<FastifyInstance> {
+  const app = Fastify({ logger, bodyLimit: 2 * 1024 * 1024, trustProxy: config.trustProxy });
 
   app.decorate('db', db ?? createPool(config.databaseUrl));
   app.decorate('config', config);
@@ -48,31 +51,91 @@ export function buildApp({ config, db, logger = false }: AppOptions): FastifyIns
     return reply.code(http.statusCode).send({ error: http.message, detail: http.detail });
   });
 
+  await app.register(helmet, {
+    // La app y la API son del mismo origen y no cargan nada de afuera.
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        // React escribe estilos en el atributo style; las firmas son data: URL.
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'blob:'],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  });
+
+  // hook preHandler: el limitador necesita el body para distinguir por cuenta.
+  await app.register(rateLimit, { global: false, hook: 'preHandler' });
+
+  /** Para el balanceador: fuera del prefijo y sin autenticación. */
   app.get('/health', async () => {
     await app.db.query('SELECT 1');
     return { status: 'ok' };
   });
 
-  app.register(authRoutes, { prefix: '/auth' });
+  await app.register(
+    async (apiScope) => {
+      apiScope.get('/health', async () => {
+        await apiScope.db.query('SELECT 1');
+        return { status: 'ok' };
+      });
 
-  // Todo lo demás exige sesión y una empresa resuelta.
-  app.register(async (secured) => {
-    secured.addHook('preHandler', async (req) => {
-      const header = req.headers.authorization;
-      if (!header?.startsWith('Bearer ')) throw new HttpError(401, 'Falta el token de sesión');
+      apiScope.register(authRoutes, { prefix: '/auth' });
 
-      const payload = verifyToken(header.slice(7), config.sessionSecret);
-      req.user = await loadUser(app.db, payload.sub);
-      req.companyId = resolveCompany(req.user, req.headers['x-company-id']);
-    });
+      // Todo lo demás exige sesión y una empresa resuelta.
+      apiScope.register(async (secured) => {
+        secured.addHook('preHandler', async (req) => {
+          const header = req.headers.authorization;
+          if (!header?.startsWith('Bearer ')) throw new HttpError(401, 'Falta el token de sesión');
 
-    secured.register(catalogRoutes, { prefix: '/catalog' });
-    secured.register(recordRoutes, { prefix: '/records' });
-    secured.register(dashboardRoutes, { prefix: '/dashboard' });
-    secured.register(adminRoutes, { prefix: '/admin' });
-  });
+          const payload = verifyToken(header.slice(7), config.sessionSecret);
+          req.user = await loadUser(app.db, payload.sub);
+          req.companyId = resolveCompany(req.user, req.headers['x-company-id']);
+        });
+
+        secured.register(catalogRoutes, { prefix: '/catalog' });
+        secured.register(recordRoutes, { prefix: '/records' });
+        secured.register(dashboardRoutes, { prefix: '/dashboard' });
+        secured.register(adminRoutes, { prefix: '/admin' });
+      });
+    },
+    { prefix: '/api' },
+  );
+
+  if (config.clientDir) await servirApp(app, config.clientDir);
 
   return app;
+}
+
+/**
+ * Sirve el build de la app desde el mismo proceso. Las rutas de la aplicación
+ * viven en el hash, así que cualquier ruta desconocida devuelve el index; una
+ * ruta de API que no existe sigue devolviendo 404 en JSON.
+ */
+async function servirApp(app: FastifyInstance, clientDir: string) {
+  await app.register(fastifyStatic, {
+    root: clientDir,
+    index: ['index.html'],
+    setHeaders(reply, ruta) {
+      // Los assets llevan hash en el nombre: se pueden cachear para siempre.
+      // El index y el service worker, nunca: un sw.js viejo en la caché del
+      // navegador deja la app clavada en una versión anterior.
+      reply.header(
+        'cache-control',
+        ruta.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
+      );
+    },
+  });
+
+  app.setNotFoundHandler((req, reply) => {
+    if (req.url.startsWith('/api/') || req.method !== 'GET') {
+      return reply.code(404).send({ error: 'No existe esa ruta' });
+    }
+    return reply.sendFile('index.html');
+  });
 }
 
 /**

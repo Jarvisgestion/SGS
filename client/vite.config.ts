@@ -1,10 +1,9 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-const proxyApi = {
-  target: 'http://127.0.0.1:3000',
-  rewrite: (ruta: string) => ruta.replace(/^\/api/, ''),
-};
+// La API vive bajo /api también en el servidor, así que no se reescribe nada:
+// en producción es un solo proceso sirviendo la app y la API.
+const proxyApi = { target: 'http://127.0.0.1:3000' };
 
 export default defineConfig({
   plugins: [react()],

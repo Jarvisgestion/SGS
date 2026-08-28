@@ -45,7 +45,7 @@ describe('permisos de administración', () => {
   it('el capitán no entra al ABM del catálogo', async () => {
     const res = await ctx.app.inject({
       method: 'GET',
-      url: '/admin/manual-versions',
+      url: '/api/admin/manual-versions',
       headers: auth(capitanToken),
     });
     assert.equal(res.statusCode, 403);
@@ -84,7 +84,7 @@ describe('el ciclo del manual', () => {
   it('crea una revisión nueva', async () => {
     const res = await ctx.app.inject({
       method: 'POST',
-      url: '/admin/manual-versions',
+      url: '/api/admin/manual-versions',
       headers: auth(pdToken),
       payload: { revision_number: 'Rev. 05', regulation: 'Ord. PNA 05/18', effective_date: '2026-09-01' },
     });
@@ -96,7 +96,7 @@ describe('el ciclo del manual', () => {
   it('al publicarla, la anterior queda superada', async () => {
     const res = await ctx.app.inject({
       method: 'POST',
-      url: `/admin/manual-versions/${manualId}/publicar`,
+      url: `/api/admin/manual-versions/${manualId}/publicar`,
       headers: auth(pdToken),
     });
     assert.equal(res.statusCode, 200);
@@ -115,7 +115,7 @@ describe('el ciclo del manual', () => {
   it('los formularios de la revisión superada dejan de ofrecerse a bordo', async () => {
     const catalogo = await ctx.app.inject({
       method: 'GET',
-      url: '/catalog/record-types',
+      url: '/api/catalog/record-types',
       headers: auth(capitanToken),
     });
     assert.equal(catalogo.json().record_types.length, 0, 'Rev. 04 quedó superada');
@@ -123,7 +123,7 @@ describe('el ciclo del manual', () => {
     // pero siguen siendo visibles para administrarlos
     const todas = await ctx.app.inject({
       method: 'GET',
-      url: '/catalog/record-types?todas_las_revisiones=true',
+      url: '/api/catalog/record-types?todas_las_revisiones=true',
       headers: auth(pdToken),
     });
     assert.equal(todas.json().record_types.length, 10);
@@ -132,7 +132,7 @@ describe('el ciclo del manual', () => {
   it('agrega un procedimiento', async () => {
     const res = await ctx.app.inject({
       method: 'POST',
-      url: '/admin/procedures',
+      url: '/api/admin/procedures',
       headers: auth(pdToken),
       payload: { manual_version_id: manualId, code: 'PO-11', name: 'Gestión de residuos', sort_order: 11 },
     });
@@ -143,7 +143,7 @@ describe('el ciclo del manual', () => {
   it('define un formulario nuevo y queda disponible a bordo sin tocar código', async () => {
     const alta = await ctx.app.inject({
       method: 'POST',
-      url: '/admin/record-types',
+      url: '/api/admin/record-types',
       headers: auth(pdToken),
       payload: {
         procedure_id: procedureId,
@@ -169,7 +169,7 @@ describe('el ciclo del manual', () => {
     // aparece en el catálogo que ve el buque
     const catalogo = await ctx.app.inject({
       method: 'GET',
-      url: '/catalog/record-types',
+      url: '/api/catalog/record-types',
       headers: auth(capitanToken),
     });
     const codigos = catalogo.json().record_types.map((rt: { code: string }) => rt.code);
@@ -178,7 +178,7 @@ describe('el ciclo del manual', () => {
     // y el capitán ya puede cargarlo
     const instancia = await ctx.app.inject({
       method: 'POST',
-      url: '/records',
+      url: '/api/records',
       headers: auth(capitanToken),
       payload: {
         record_type_id: nuevoId,
@@ -192,7 +192,7 @@ describe('el ciclo del manual', () => {
   it('rechaza un formulario mal definido con el motivo de la base', async () => {
     const res = await ctx.app.inject({
       method: 'POST',
-      url: '/admin/record-types',
+      url: '/api/admin/record-types',
       headers: auth(pdToken),
       payload: {
         procedure_id: procedureId,
@@ -215,7 +215,7 @@ describe('el ciclo del manual', () => {
 
     const res = await ctx.app.inject({
       method: 'PATCH',
-      url: `/admin/record-types/${antes.id}`,
+      url: `/api/admin/record-types/${antes.id}`,
       headers: auth(pdToken),
       payload: {
         field_schema: [
@@ -239,7 +239,7 @@ describe('el ciclo del manual', () => {
 
     const detalle = await ctx.app.inject({
       method: 'GET',
-      url: `/records/${instancias[0]!.id}`,
+      url: `/api/records/${instancias[0]!.id}`,
       headers: auth(capitanToken),
     });
     const claves = detalle.json().field_schema.map((f: { key: string }) => f.key);
@@ -253,7 +253,7 @@ describe('el ciclo del manual', () => {
     );
     const res = await ctx.app.inject({
       method: 'PATCH',
-      url: `/admin/record-types/${rows[0]!.id}`,
+      url: `/api/admin/record-types/${rows[0]!.id}`,
       headers: auth(pdToken),
       payload: { status: 'derogado' },
     });
@@ -261,7 +261,7 @@ describe('el ciclo del manual', () => {
 
     const catalogo = await ctx.app.inject({
       method: 'GET',
-      url: '/catalog/record-types',
+      url: '/api/catalog/record-types',
       headers: auth(capitanToken),
     });
     const codigos = catalogo.json().record_types.map((rt: { code: string }) => rt.code);
@@ -273,7 +273,7 @@ describe('flota y personas', () => {
   it('da de alta un buque', async () => {
     const res = await ctx.app.inject({
       method: 'POST',
-      url: '/admin/vessels',
+      url: '/api/admin/vessels',
       headers: auth(pdToken),
       payload: { name: 'Nuevo Amanecer', matricula: 'M-0999', vessel_type: 'buque motor', service: 'pesquero' },
     });
@@ -283,7 +283,7 @@ describe('flota y personas', () => {
   it('no admite dos buques con la misma matrícula', async () => {
     const res = await ctx.app.inject({
       method: 'POST',
-      url: '/admin/vessels',
+      url: '/api/admin/vessels',
       headers: auth(pdToken),
       payload: { name: 'Otro', matricula: 'M-0999' },
     });
@@ -293,7 +293,7 @@ describe('flota y personas', () => {
   it('da de alta una persona con su rol y puede entrar', async () => {
     const alta = await ctx.app.inject({
       method: 'POST',
-      url: '/admin/users',
+      url: '/api/admin/users',
       headers: auth(pdToken),
       payload: {
         full_name: 'Oficial Nuevo',
@@ -308,7 +308,7 @@ describe('flota y personas', () => {
 
     const sesion = await ctx.app.inject({
       method: 'POST',
-      url: '/auth/login',
+      url: '/api/auth/login',
       payload: { email: 'oficial@admin.test', password: 'clave-larga-123' },
     });
     assert.equal(sesion.statusCode, 200);
@@ -319,14 +319,14 @@ describe('flota y personas', () => {
   });
 
   it('el cambio de mando exige cerrar el rol saliente', async () => {
-    const lista = await ctx.app.inject({ method: 'GET', url: '/admin/users', headers: auth(pdToken) });
+    const lista = await ctx.app.inject({ method: 'GET', url: '/api/admin/users', headers: auth(pdToken) });
     const capitanRow = lista
       .json()
       .users.find((u: { email: string }) => u.email === 'capitan@admin.test');
 
     const choque = await ctx.app.inject({
       method: 'POST',
-      url: `/admin/users/${capitanRow.id}/roles`,
+      url: `/api/admin/users/${capitanRow.id}/roles`,
       headers: auth(pdToken),
       payload: { role_code: 'capitan', vessel_id: DEMO_VESSEL },
     });
@@ -335,14 +335,14 @@ describe('flota y personas', () => {
     const rolVigente = capitanRow.roles[0];
     const cierre = await ctx.app.inject({
       method: 'DELETE',
-      url: `/admin/users/${capitanRow.id}/roles/${rolVigente.id}`,
+      url: `/api/admin/users/${capitanRow.id}/roles/${rolVigente.id}`,
       headers: auth(pdToken),
     });
     assert.equal(cierre.statusCode, 200);
 
     const nuevo = await ctx.app.inject({
       method: 'POST',
-      url: `/admin/users/${capitanRow.id}/roles`,
+      url: `/api/admin/users/${capitanRow.id}/roles`,
       headers: auth(pdToken),
       payload: { role_code: 'capitan', vessel_id: DEMO_VESSEL },
     });

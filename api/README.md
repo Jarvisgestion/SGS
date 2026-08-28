@@ -43,6 +43,9 @@ npm run typecheck
 
 ## Rutas
 
+Todas cuelgan de `/api`. `GET /health`, en cambio, va en la raíz y sin
+autenticación, para el chequeo del balanceador.
+
 | Método | Ruta | Para qué |
 |---|---|---|
 | `POST` | `/auth/login` | Devuelve el token de sesión y los roles vigentes |
@@ -105,4 +108,6 @@ npm run typecheck
    como punto de partida, que es como se trabaja en la práctica.
 4. **Paginado por cursor** en `/records` si el volumen lo pide; hoy es
    `limit`/`offset`.
-5. **Rate limiting en `/auth/login`.**
+5. **Política de bloqueo de cuenta.** Hoy hay un freno de intentos por minuto
+   por IP + cuenta; falta decidir, junto con el proveedor de identidad, si
+   corresponde además bloquear la cuenta tras N fallos y cómo se desbloquea.

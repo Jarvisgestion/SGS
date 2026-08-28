@@ -2,7 +2,7 @@ import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 
 const config = loadConfig();
-const app = buildApp({ config, logger: true });
+const app = await buildApp({ config, logger: true });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
@@ -12,3 +12,8 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 }
 
 await app.listen({ port: config.port, host: config.host });
+app.log.info(
+  config.clientDir
+    ? `sirviendo la app desde ${config.clientDir}`
+    : 'sin build de la app: sólo API (levantá el cliente con npm run dev)',
+);

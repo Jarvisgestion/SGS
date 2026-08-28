@@ -23,6 +23,12 @@ interface PgError {
   constraint?: string;
 }
 
+/** Errores que genera el propio Fastify: 429 del limitador, 400 de un JSON roto. */
+interface ErrorDeFastify {
+  statusCode?: number;
+  message?: string;
+}
+
 /** SQLSTATE -> HTTP. Sólo estos códigos exponen el mensaje de la base. */
 const SQLSTATE_TO_HTTP: Record<string, number> = {
   P0001: 422, // RAISE EXCEPTION de nuestras funciones de validación
@@ -45,6 +51,14 @@ export function toHttpError(err: unknown): HttpError {
       return new HttpError(status, cleanMessage(pg), { constraint: pg.constraint });
     }
   }
+
+  // Un 4xx que ya viene decidido (limitador, body inválido) se respeta: si no,
+  // el cliente ve un 500 y cree que el problema es del servidor.
+  const fastify = err as ErrorDeFastify;
+  if (typeof fastify?.statusCode === 'number' && fastify.statusCode >= 400 && fastify.statusCode < 500) {
+    return new HttpError(fastify.statusCode, fastify.message ?? 'Pedido rechazado');
+  }
+
   return new HttpError(500, 'Error interno');
 }
 

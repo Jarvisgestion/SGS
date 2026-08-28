@@ -63,7 +63,7 @@ describe('autenticación', () => {
   it('rechaza una contraseña incorrecta', async () => {
     const res = await ctx.app.inject({
       method: 'POST',
-      url: '/auth/login',
+      url: '/api/auth/login',
       payload: { email: capitan.email, password: 'no-es' },
     });
     assert.equal(res.statusCode, 401);
@@ -72,7 +72,7 @@ describe('autenticación', () => {
   it('rechaza un email inexistente sin filtrar que no existe', async () => {
     const res = await ctx.app.inject({
       method: 'POST',
-      url: '/auth/login',
+      url: '/api/auth/login',
       payload: { email: 'nadie@ejemplo.test', password: 'x' },
     });
     assert.equal(res.statusCode, 401);
@@ -82,7 +82,7 @@ describe('autenticación', () => {
   it('devuelve los roles vigentes al iniciar sesión', async () => {
     const res = await ctx.app.inject({
       method: 'POST',
-      url: '/auth/login',
+      url: '/api/auth/login',
       payload: { email: capitan.email, password: capitan.password },
     });
     assert.equal(res.statusCode, 200);
@@ -93,14 +93,49 @@ describe('autenticación', () => {
   });
 
   it('exige token en las rutas protegidas', async () => {
-    const res = await ctx.app.inject({ method: 'GET', url: '/catalog/record-types' });
+    const res = await ctx.app.inject({ method: 'GET', url: '/api/catalog/record-types' });
     assert.equal(res.statusCode, 401);
+  });
+
+  it('frena el sondeo de contraseñas de una cuenta', async () => {
+    const propio = await setupApi({ loginRateLimit: 3 });
+    try {
+      const victima = await createUser(propio.db, {
+        companyId: DEMO_COMPANY,
+        fullName: 'Objetivo',
+        email: 'objetivo@ejemplo.test',
+        role: 'capitan',
+        vesselId: DEMO_VESSEL,
+      });
+
+      const intento = () =>
+        propio.app.inject({
+          method: 'POST',
+          url: '/api/auth/login',
+          payload: { email: victima.email, password: 'adivinanza' },
+        });
+
+      assert.equal((await intento()).statusCode, 401);
+      assert.equal((await intento()).statusCode, 401);
+      assert.equal((await intento()).statusCode, 401);
+      assert.equal((await intento()).statusCode, 429);
+
+      // otra cuenta desde el mismo lugar no queda bloqueada
+      const otra = await propio.app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        payload: { email: 'otro@ejemplo.test', password: 'x' },
+      });
+      assert.equal(otra.statusCode, 401);
+    } finally {
+      await teardownApi(propio);
+    }
   });
 
   it('rechaza un token adulterado', async () => {
     const res = await ctx.app.inject({
       method: 'GET',
-      url: '/catalog/record-types',
+      url: '/api/catalog/record-types',
       headers: auth(`${capitanToken.split('.')[0]}.firmafalsa`),
     });
     assert.equal(res.statusCode, 401);
@@ -111,7 +146,7 @@ describe('catálogo', () => {
   it('lista los tipos de registro de la empresa', async () => {
     const res = await ctx.app.inject({
       method: 'GET',
-      url: '/catalog/record-types',
+      url: '/api/catalog/record-types',
       headers: auth(capitanToken),
     });
     assert.equal(res.statusCode, 200);
@@ -123,7 +158,7 @@ describe('catálogo', () => {
   it('devuelve el field_schema para dibujar el formulario', async () => {
     const res = await ctx.app.inject({
       method: 'GET',
-      url: `/catalog/record-types/${incendioTypeId}`,
+      url: `/api/catalog/record-types/${incendioTypeId}`,
       headers: auth(capitanToken),
     });
     assert.equal(res.statusCode, 200);
@@ -134,7 +169,7 @@ describe('catálogo', () => {
   it('no expone el catálogo de otra empresa', async () => {
     const res = await ctx.app.inject({
       method: 'GET',
-      url: `/catalog/record-types/${incendioTypeId}`,
+      url: `/api/catalog/record-types/${incendioTypeId}`,
       headers: auth(ajenoToken),
     });
     assert.equal(res.statusCode, 404);
@@ -148,7 +183,7 @@ describe('ciclo de vida de un registro', () => {
   it('crea un borrador incompleto (carga offline)', async () => {
     const res = await ctx.app.inject({
       method: 'POST',
-      url: '/records',
+      url: '/api/records',
       headers: auth(capitanToken),
       payload: {
         record_type_id: incendioTypeId,
@@ -172,7 +207,7 @@ describe('ciclo de vida de un registro', () => {
     const token = await login(ctx.app, tripulante);
     const res = await ctx.app.inject({
       method: 'POST',
-      url: '/records',
+      url: '/api/records',
       headers: auth(token),
       payload: { record_type_id: incendioTypeId, vessel_id: DEMO_VESSEL, data: {} },
     });
@@ -183,7 +218,7 @@ describe('ciclo de vida de un registro', () => {
   it('no envía un formulario incompleto', async () => {
     const res = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/submit`,
+      url: `/api/records/${recordId}/submit`,
       headers: auth(capitanToken),
     });
     assert.equal(res.statusCode, 422);
@@ -193,7 +228,7 @@ describe('ciclo de vida de un registro', () => {
   it('rechaza un ítem que no está en el checklist', async () => {
     const res = await ctx.app.inject({
       method: 'PATCH',
-      url: `/records/${recordId}`,
+      url: `/api/records/${recordId}`,
       headers: auth(capitanToken),
       payload: {
         data: {
@@ -206,7 +241,7 @@ describe('ciclo de vida de un registro', () => {
     assert.equal(res.statusCode, 200);
     const submit = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/submit`,
+      url: `/api/records/${recordId}/submit`,
       headers: auth(capitanToken),
     });
     assert.equal(submit.statusCode, 422);
@@ -216,7 +251,7 @@ describe('ciclo de vida de un registro', () => {
   it('completa el formulario', async () => {
     const res = await ctx.app.inject({
       method: 'PATCH',
-      url: `/records/${recordId}`,
+      url: `/api/records/${recordId}`,
       headers: auth(capitanToken),
       payload: {
         data: {
@@ -240,7 +275,7 @@ describe('ciclo de vida de un registro', () => {
   it('no envía sin las firmas del formulario', async () => {
     const res = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/submit`,
+      url: `/api/records/${recordId}/submit`,
       headers: auth(capitanToken),
     });
     assert.equal(res.statusCode, 422);
@@ -250,7 +285,7 @@ describe('ciclo de vida de un registro', () => {
   it('este registro exige firma manuscrita y PIN', async () => {
     const sinImagen = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/signatures`,
+      url: `/api/records/${recordId}/signatures`,
       headers: auth(capitanToken),
       payload: { field_key: 'firma_capitan', pin: capitan.pin },
     });
@@ -258,7 +293,7 @@ describe('ciclo de vida de un registro', () => {
 
     const adjunto = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/attachments`,
+      url: `/api/records/${recordId}/attachments`,
       headers: auth(capitanToken),
       payload: { file_url: 's3://firmas/cap.png', file_type: 'image' },
     });
@@ -267,7 +302,7 @@ describe('ciclo de vida de un registro', () => {
 
     const pinMal = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/signatures`,
+      url: `/api/records/${recordId}/signatures`,
       headers: auth(capitanToken),
       payload: { field_key: 'firma_capitan', pin: '0000', signature_image_id: firmaId },
     });
@@ -277,7 +312,7 @@ describe('ciclo de vida de un registro', () => {
   it('rechaza un bloque de firma que el formulario no declara', async () => {
     const res = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/signatures`,
+      url: `/api/records/${recordId}/signatures`,
       headers: auth(capitanToken),
       payload: { field_key: 'firma_inventada', pin: capitan.pin, signature_image_id: firmaId },
     });
@@ -287,7 +322,7 @@ describe('ciclo de vida de un registro', () => {
   it('firma y envía', async () => {
     const firma = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/signatures`,
+      url: `/api/records/${recordId}/signatures`,
       headers: auth(capitanToken),
       payload: { field_key: 'firma_capitan', pin: capitan.pin, signature_image_id: firmaId },
     });
@@ -296,7 +331,7 @@ describe('ciclo de vida de un registro', () => {
 
     const res = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/submit`,
+      url: `/api/records/${recordId}/submit`,
       headers: auth(capitanToken),
     });
     assert.equal(res.statusCode, 200);
@@ -306,7 +341,7 @@ describe('ciclo de vida de un registro', () => {
   it('no admite dos firmas sobre el mismo bloque', async () => {
     const res = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/signatures`,
+      url: `/api/records/${recordId}/signatures`,
       headers: auth(capitanToken),
       payload: { field_key: 'firma_capitan', pin: capitan.pin, signature_image_id: firmaId },
     });
@@ -316,7 +351,7 @@ describe('ciclo de vida de un registro', () => {
   it('el capitán no puede aprobar su propio registro', async () => {
     const res = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/reviews`,
+      url: `/api/records/${recordId}/reviews`,
       headers: auth(capitanToken),
       payload: { decision: 'aprobado' },
     });
@@ -326,7 +361,7 @@ describe('ciclo de vida de un registro', () => {
   it('observar exige comentario y devuelve el registro a bordo', async () => {
     const sinComentario = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/reviews`,
+      url: `/api/records/${recordId}/reviews`,
       headers: auth(pdToken),
       payload: { decision: 'observado' },
     });
@@ -334,7 +369,7 @@ describe('ciclo de vida de un registro', () => {
 
     const res = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/reviews`,
+      url: `/api/records/${recordId}/reviews`,
       headers: auth(pdToken),
       payload: { decision: 'observado', comment: 'Detallá la trampilla trabada' },
     });
@@ -342,7 +377,7 @@ describe('ciclo de vida de un registro', () => {
 
     const detalle = await ctx.app.inject({
       method: 'GET',
-      url: `/records/${recordId}`,
+      url: `/api/records/${recordId}`,
       headers: auth(capitanToken),
     });
     assert.equal(detalle.json().status, 'observado');
@@ -351,7 +386,7 @@ describe('ciclo de vida de un registro', () => {
   it('el registro observado vuelve a borrador al editarse', async () => {
     const res = await ctx.app.inject({
       method: 'PATCH',
-      url: `/records/${recordId}`,
+      url: `/api/records/${recordId}`,
       headers: auth(capitanToken),
       payload: { marea: 'Marea 12' },
     });
@@ -362,12 +397,12 @@ describe('ciclo de vida de un registro', () => {
   it('se aprueba y queda de sólo lectura', async () => {
     await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/submit`,
+      url: `/api/records/${recordId}/submit`,
       headers: auth(capitanToken),
     });
     const res = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/reviews`,
+      url: `/api/records/${recordId}/reviews`,
       headers: auth(pdToken),
       payload: { decision: 'aprobado', comment: 'Conforme' },
     });
@@ -375,7 +410,7 @@ describe('ciclo de vida de un registro', () => {
 
     const edicion = await ctx.app.inject({
       method: 'PATCH',
-      url: `/records/${recordId}`,
+      url: `/api/records/${recordId}`,
       headers: auth(capitanToken),
       payload: { marea: 'Marea 13' },
     });
@@ -383,7 +418,7 @@ describe('ciclo de vida de un registro', () => {
 
     const nuevaRevision = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${recordId}/reviews`,
+      url: `/api/records/${recordId}/reviews`,
       headers: auth(pdToken),
       payload: { decision: 'observado', comment: 'tarde' },
     });
@@ -393,7 +428,7 @@ describe('ciclo de vida de un registro', () => {
   it('conserva todo el historial de revisión y la firma', async () => {
     const res = await ctx.app.inject({
       method: 'GET',
-      url: `/records/${recordId}`,
+      url: `/api/records/${recordId}`,
       headers: auth(pdToken),
     });
     const body = res.json();
@@ -409,7 +444,7 @@ describe('ciclo de vida de un registro', () => {
   it('no deja ver el registro a otra empresa', async () => {
     const res = await ctx.app.inject({
       method: 'GET',
-      url: `/records/${recordId}`,
+      url: `/api/records/${recordId}`,
       headers: auth(ajenoToken),
     });
     assert.equal(res.statusCode, 404);
@@ -432,7 +467,7 @@ describe('firma por PIN', () => {
     const typeId = await recordTypeId(ctx.db, 'RO-05C');
     const creado = await ctx.app.inject({
       method: 'POST',
-      url: '/records',
+      url: '/api/records',
       headers: auth(capitanToken),
       payload: {
         record_type_id: typeId,
@@ -447,7 +482,7 @@ describe('firma por PIN', () => {
 
     const firma = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${creado.json().id}/signatures`,
+      url: `/api/records/${creado.json().id}/signatures`,
       headers: auth(capitanToken),
       payload: { field_key: 'firma_capitan', pin: capitan.pin },
     });
@@ -456,7 +491,7 @@ describe('firma por PIN', () => {
 
     const enviado = await ctx.app.inject({
       method: 'POST',
-      url: `/records/${creado.json().id}/submit`,
+      url: `/api/records/${creado.json().id}/submit`,
       headers: auth(capitanToken),
     });
     assert.equal(enviado.statusCode, 200);
@@ -467,7 +502,7 @@ describe('tablero', () => {
   it('marca los registros recurrentes sin cargar (RA-06C)', async () => {
     const res = await ctx.app.inject({
       method: 'GET',
-      url: '/dashboard/compliance?only_pending=true',
+      url: '/api/dashboard/compliance?only_pending=true',
       headers: auth(pdToken),
     });
     assert.equal(res.statusCode, 200);
@@ -480,7 +515,7 @@ describe('tablero', () => {
   it('expone los desvíos de checklist sin tabla aparte', async () => {
     const res = await ctx.app.inject({
       method: 'GET',
-      url: '/dashboard/nonconformities',
+      url: '/api/dashboard/nonconformities',
       headers: auth(pdToken),
     });
     assert.equal(res.statusCode, 200);
@@ -492,7 +527,7 @@ describe('tablero', () => {
   it('lista la bandeja de revisión pendiente', async () => {
     const res = await ctx.app.inject({
       method: 'GET',
-      url: '/dashboard/pending-reviews',
+      url: '/api/dashboard/pending-reviews',
       headers: auth(pdToken),
     });
     assert.equal(res.statusCode, 200);

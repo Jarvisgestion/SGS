@@ -14,6 +14,7 @@ empresa.
 | Esquema PostgreSQL + migraciones | `db/`, `docs/03-esquema-sql.md` | Hecho, con aserciones |
 | API HTTP | `api/` | Ciclo de registro y ABM del catálogo |
 | Cliente a bordo y de tierra | `client/` | Carga sin señal, firma, revisión, tablero y edición del manual |
+| Despliegue | `Dockerfile`, `DEPLOY.md` | Un solo contenedor: API y app en el mismo origen |
 | Prueba del circuito completo | `e2e/` | En navegador real, sobre la base real |
 | Catálogo real de Xeitosiño / Pesantar | — | Pendiente del relevamiento |
 
@@ -58,6 +59,12 @@ la bandeja de revisión y el tablero. El PIN es el que se firma en pantalla.
 `npm run credentials -- --listar` muestra los usuarios cargados y si tienen
 clave y PIN.
 
+## En producción
+
+Se despliega como un solo contenedor: un proceso sirve la API bajo `/api` y la
+aplicación en el resto. Los pasos, las variables y lo que falta resolver antes
+de ponerlo en manos de un cliente están en [`DEPLOY.md`](DEPLOY.md).
+
 ## Verificación
 
 ```bash
@@ -66,6 +73,10 @@ cd api    && npm test         # ciclo del registro contra la base real
 cd client && npm test         # formularios dinámicos y sincronización
 cd e2e    && npm test         # circuito completo en un navegador real
 ```
+
+Las pruebas de punta a punta levantan el mismo proceso que se despliega —API y
+app en un solo servicio— así que lo que se verifica es el artefacto real, no una
+aproximación de desarrollo.
 
 `e2e/` levanta la base, la API y la app, y recorre el circuito entero: el
 capitán carga un incendio, lo firma con trazo y PIN, lo envía; tierra lo

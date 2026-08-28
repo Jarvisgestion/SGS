@@ -9,7 +9,24 @@ const loginBody = z.object({
 });
 
 export async function authRoutes(app: FastifyInstance) {
-  app.post('/login', async (req) => {
+  app.post('/login', {
+    /**
+     * Freno para el sondeo de contraseñas.
+     *
+     * La clave combina IP y cuenta a propósito: limitar sólo por IP haría que
+     * en un buque o una oficina —donde todos salen por la misma— una persona
+     * dejara afuera a las demás. Detrás de un balanceador hace falta
+     * SGS_TRUST_PROXY para que el IP sea el real y no el del proxy.
+     */
+    config: {
+      rateLimit: {
+        max: app.config.loginRateLimit,
+        timeWindow: '1 minute',
+        keyGenerator: (req: { ip: string; body?: unknown }) =>
+          `${req.ip}:${((req.body as { email?: string } | undefined)?.email ?? '').toLowerCase()}`,
+      },
+    },
+  }, async (req) => {
     const { email, password } = loginBody.parse(req.body);
 
     const { rows } = await app.db.query<{ id: string; password_hash: string | null }>(

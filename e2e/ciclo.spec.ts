@@ -107,9 +107,10 @@ test('el capitán carga un incendio, lo firma y lo envía; tierra lo observa y d
   await expect(page.getByText('Firma manuscrita')).toBeVisible();
 });
 
-// Contra el build de producción: es donde el service worker está activo.
+// Contra el proceso de producción (un solo servicio sirviendo API y app): es
+// donde el service worker está activo y donde todo comparte origen.
 test.describe('sin señal', () => {
-  test.use({ baseURL: 'http://127.0.0.1:4173' });
+  test.use({ baseURL: 'http://127.0.0.1:3000' });
 
   test('el formulario se sigue cargando sin señal y se sube al recuperarla', async ({ page, context }) => {
   await entrar(page, CREDENCIALES.capitan);

@@ -21,7 +21,7 @@ export interface TestContext {
 }
 
 /** Base descartable con migraciones y seed aplicados. */
-export async function setupApi(): Promise<TestContext> {
+export async function setupApi(opciones?: { loginRateLimit?: number }): Promise<TestContext> {
   const dbName = `sgs_api_test_${randomUUID().slice(0, 8)}`;
   execFileSync('createdb', [dbName], { stdio: 'inherit' });
   execFileSync(path.join(repoRoot, 'scripts/db-apply.sh'), ['--with-seed'], {
@@ -30,13 +30,16 @@ export async function setupApi(): Promise<TestContext> {
   });
 
   const db = createPool(`postgres:///${dbName}`);
-  const app = buildApp({
+  const app = await buildApp({
     config: {
       port: 0,
       host: '127.0.0.1',
       databaseUrl: `postgres:///${dbName}`,
       sessionSecret: SESSION_SECRET,
       sessionTtlSeconds: 3600,
+      clientDir: null, // en los tests sólo importa la API
+      trustProxy: false,
+      loginRateLimit: opciones?.loginRateLimit ?? 1000,
     },
     db,
   });
@@ -90,7 +93,7 @@ export async function createUser(
 export async function login(app: FastifyInstance, user: SeededUser): Promise<string> {
   const res = await app.inject({
     method: 'POST',
-    url: '/auth/login',
+    url: '/api/auth/login',
     payload: { email: user.email, password: user.password },
   });
   if (res.statusCode !== 200) throw new Error(`login falló: ${res.statusCode} ${res.body}`);

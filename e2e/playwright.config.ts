@@ -25,33 +25,32 @@ export default defineConfig({
   },
   webServer: [
     {
-      // El setup corre antes de levantar la API para garantizar el orden.
+      // Un solo proceso, como en producción: la API bajo /api y la app servida
+      // desde el mismo origen. El setup corre antes para garantizar el orden.
       command:
-        'node --experimental-strip-types ../e2e/setup.ts && node --experimental-strip-types src/server.ts',
+        'npm --prefix ../client run build && ' +
+        'node --experimental-strip-types ../e2e/setup.ts && ' +
+        'node --experimental-strip-types src/server.ts',
       cwd: path.join(raiz, 'api'),
       port: 3000,
-      timeout: 90_000,
+      timeout: 120_000,
       reuseExistingServer: false,
       env: {
         DATABASE_URL: `postgres:///${DB}`,
         SGS_SESSION_SECRET: 'secreto-de-prueba-de-al-menos-32-caracteres',
+        SGS_CLIENT_DIR: path.join(raiz, 'client', 'dist'),
+        // Los tests entran y salen muchas veces con la misma cuenta; el freno
+        // al sondeo de contraseñas se prueba aparte, en api/test/api.test.ts.
+        SGS_LOGIN_RATE_LIMIT: '1000',
         PORT: '3000',
       },
     },
     {
+      // El servidor de desarrollo, contra el que corre la mayoría de los tests.
       command: 'npm run dev',
       cwd: path.join(raiz, 'client'),
       port: 5173,
       timeout: 90_000,
-      reuseExistingServer: false,
-    },
-    {
-      // Build real: es el único donde corre el service worker, que es lo que
-      // permite reabrir la app sin señal.
-      command: 'npm run build && npm run preview',
-      cwd: path.join(raiz, 'client'),
-      port: 4173,
-      timeout: 120_000,
       reuseExistingServer: false,
     },
   ],
