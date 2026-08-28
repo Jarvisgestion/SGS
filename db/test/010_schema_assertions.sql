@@ -273,6 +273,12 @@ BEGIN
     format($f$DELETE FROM signatures WHERE record_instance_id = %L$f$, ri),
     'append-only', 'las firmas no se borran');
 
+  -- sólo revisa quien tiene un rol habilitado
+  PERFORM pg_temp.assert_fails(
+    format($f$INSERT INTO record_reviews (record_instance_id, reviewer_id, decision, comment)
+              VALUES (%L, %L, 'aprobado', 'me autoapruebo')$f$, ri, cap),
+    'rol habilitado para revisar', 'el capitán no puede aprobar su propio registro');
+
   -- observación: exige comentario y devuelve el registro a bordo
   PERFORM pg_temp.assert_fails(
     format($f$INSERT INTO record_reviews (record_instance_id, reviewer_id, decision)

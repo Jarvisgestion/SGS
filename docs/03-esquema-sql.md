@@ -51,9 +51,10 @@ Estas reglas están como constraints o triggers, y todas tienen su aserción en
   agregue `WHERE company_id = ...`.
 - **Alcance del registro.** `scope = vessel` exige `vessel_id`; `scope = company`
   lo prohíbe.
-- **Quién puede emitir.** `allowed_creator_roles` se verifica contra los roles
-  vigentes del usuario en ese buque y a esa fecha — es lo que hace cumplible la
-  restricción de emisores de la NNC.
+- **Quién puede emitir y quién revisar.** `allowed_creator_roles` y
+  `allowed_reviewer_roles` se verifican contra los roles vigentes del usuario en
+  ese buque y a esa fecha — es lo que hace cumplible la restricción de emisores
+  de la NNC, y lo que impide que el Capitán apruebe su propio registro.
 - **Validación del formulario.** `data` se valida contra el `field_schema` de la
   versión congelada al salir de borrador: campos obligatorios, tipos, opciones
   de `select`/`checklist`, columnas declaradas de las tablas, y campos no
@@ -104,7 +105,11 @@ tiene que estar completo y bien tipado.
    va a conectarse con un rol de base por empresa, corresponde agregar Row
    Level Security sobre `company_id`; el esquema ya tiene la columna en todas
    las tablas operativas para poder hacerlo sin rediseño.
-5. **Retención y borrado** — hay FKs `ON DELETE RESTRICT` en lo que no debería
+5. **API.** La capa HTTP sobre este esquema está en `api/` (ver su README): el
+   ciclo completo del registro —alta en borrador, guardado parcial, firma,
+   envío, revisión y tablero— está implementado y probado contra la base real.
+   Falta el ABM del catálogo (hoy se carga por SQL) y la subida de archivos.
+6. **Retención y borrado** — hay FKs `ON DELETE RESTRICT` en lo que no debería
    poder borrarse (una empresa con registros, un tipo de registro con
    instancias). Falta la política formal de cuánto se conserva un registro
    aprobado.
