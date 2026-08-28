@@ -13,9 +13,28 @@ cp .env.example .env          # completar SGS_SESSION_SECRET
 createdb sgs_dev
 PGDATABASE=sgs_dev ../scripts/db-apply.sh --with-seed
 
-npm run credentials -- --email capitan@ejemplo.com --password '...' --pin 4821
 npm start                     # o npm run dev
 ```
+
+## Usuarios
+
+El seed carga el catálogo, no las personas. El alta se hace con:
+
+```bash
+# crear un usuario con su rol
+npm run credentials -- --crear --email capitan@empresa.com --nombre "Juan Pérez" \
+  --password 'una-clave' --pin 4821 --rol capitan --buque M-0827
+
+# cambiar la clave o el PIN de alguien que ya existe
+npm run credentials -- --email capitan@empresa.com --password 'otra-clave'
+
+# ver quién está cargado
+npm run credentials -- --listar
+```
+
+`--buque` acepta matrícula o nombre; `--empresa` sólo hace falta si hay más de
+una cargada. Sin `--rol` el usuario entra pero no puede emitir registros: los
+permisos salen de los roles vigentes (ver `docs/03-esquema-sql.md` §3).
 
 ```bash
 npm test        # levanta una base descartable, aplica migraciones y corre todo

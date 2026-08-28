@@ -19,15 +19,44 @@ empresa.
 
 ## Puesta en marcha
 
+Requiere **PostgreSQL 15 o mayor** (el esquema usa `ON DELETE SET NULL` por
+columna) y **Node 22 o mayor**.
+
 ```bash
+# 1. base de datos, con el catálogo de demostración
 createdb sgs_dev
 PGDATABASE=sgs_dev ./scripts/db-apply.sh --with-seed
 
-cd api && npm install && cp .env.example .env   # completar SGS_SESSION_SECRET
-npm start
+# 2. API
+cd api
+npm install
+cp .env.example .env
+#    completar en .env:
+#      DATABASE_URL=postgres:///sgs_dev
+#      SGS_SESSION_SECRET=$(openssl rand -hex 32)
 
-cd ../client && npm install && npm run dev      # http://localhost:5173
+# 3. usuarios (el seed carga el catálogo, no las personas)
+DATABASE_URL=postgres:///sgs_dev npm run credentials -- --crear \
+  --email capitan@demo.test --nombre "Juan Pérez" \
+  --password 'demo1234' --pin 4821 --rol capitan --buque M-0827
+
+DATABASE_URL=postgres:///sgs_dev npm run credentials -- --crear \
+  --email pd@demo.test --nombre "Ana Gómez" \
+  --password 'demo1234' --pin 9134 --rol persona_designada
+
+npm start                    # API en :3000
+
+# 4. app
+cd ../client
+npm install
+npm run dev                  # http://localhost:5173
 ```
+
+Entrando como `capitan@demo.test` se ve la app de a bordo; como `pd@demo.test`,
+la bandeja de revisión y el tablero. El PIN es el que se firma en pantalla.
+
+`npm run credentials -- --listar` muestra los usuarios cargados y si tienen
+clave y PIN.
 
 ## Verificación
 
