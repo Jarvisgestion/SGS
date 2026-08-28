@@ -422,4 +422,5 @@ sin necesidad de un modo offline complejo.
 4. **Elegir motor de persistencia concreto** (Postgres con JSONB es la opción más
    directa dado que casi todo acá es JSON Schema + relaciones; también serviría
    un documental si se prefiere) y traducir este documento a migraciones/schema
-   real.
+   real. — **Hecho:** PostgreSQL 16; migraciones en `db/migrations/`, decisiones
+   y pendientes en `03-esquema-sql.md`.
