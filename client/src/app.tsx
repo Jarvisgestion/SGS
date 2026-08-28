@@ -36,8 +36,11 @@ export function App() {
   const ruta = useRuta();
 
   const recargarBorradores = useCallback(async () => {
-    setBorradores((await drafts.all()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
-  }, []);
+    if (!session) return setBorradores([]);
+    setBorradores(
+      (await drafts.all(session.user.id)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    );
+  }, [session]);
 
   /**
    * El catálogo se guarda en IndexedDB apenas se baja: es lo que permite abrir
@@ -80,7 +83,8 @@ export function App() {
   }, [session, recargarBorradores, refrescarCatalogo]);
 
   const sincronizar = useCallback(async () => {
-    const pendientes = (await drafts.all()).filter((d) => d.dirty);
+    if (!session) return;
+    const pendientes = (await drafts.all(session.user.id)).filter((d) => d.dirty);
     if (pendientes.length === 0) {
       setAvisoSync(null);
       return;
@@ -102,7 +106,7 @@ export function App() {
           ? 'Tierra rechazó algún borrador. Abrilo para ver el motivo.'
           : null,
     );
-  }, [recargarBorradores]);
+  }, [recargarBorradores, session]);
 
   // Al recuperar señal se suben solos los borradores que quedaron pendientes.
   useEffect(() => {

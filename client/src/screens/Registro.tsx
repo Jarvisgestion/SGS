@@ -61,6 +61,7 @@ export function Registro({ ctx, id }: { ctx: Contexto; id: string }) {
   async function corregirABordo() {
     if (!registro) return;
     const copia = newDraft({
+      userId: ctx.session.user.id,
       companyId: ctx.session.user.companies[0]!,
       recordTypeId: registro.record_type_id,
       recordTypeCode: registro.record_type_code,

@@ -48,6 +48,7 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
         setBorrador(
           existente ??
             newDraft({
+              userId: ctx.session.user.id,
               companyId: ctx.session.user.companies[0]!,
               recordTypeId: detalle.id,
               recordTypeCode: detalle.code,

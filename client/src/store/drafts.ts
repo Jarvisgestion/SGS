@@ -7,6 +7,13 @@ import { DRAFTS, idb } from './idb.ts';
  */
 export interface Draft {
   localId: string;
+  /**
+   * Quién lo está cargando. IndexedDB es del dispositivo, no de la persona: en
+   * una tablet compartida a bordo, sin esto el borrador del capitán le
+   * aparecería al siguiente que entre — y al sincronizarlo, tierra lo
+   * rechazaría por rol.
+   */
+  userId: string;
   companyId: string;
   recordTypeId: string;
   recordTypeCode: string;
@@ -26,6 +33,7 @@ export interface Draft {
 }
 
 export function newDraft(input: {
+  userId: string;
   companyId: string;
   recordTypeId: string;
   recordTypeCode: string;
@@ -46,7 +54,8 @@ export function newDraft(input: {
 }
 
 export const drafts = {
-  all: () => idb.getAll<Draft>(DRAFTS),
+  /** Sólo los de esa persona: el almacenamiento es compartido, los borradores no. */
+  all: async (userId: string) => (await idb.getAll<Draft>(DRAFTS)).filter((d) => d.userId === userId),
   get: (localId: string) => idb.get<Draft>(DRAFTS, localId),
   save: (draft: Draft) => idb.put(DRAFTS, { ...draft, updatedAt: new Date().toISOString() }),
   remove: (localId: string) => idb.delete(DRAFTS, localId),

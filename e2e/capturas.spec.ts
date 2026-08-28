@@ -41,8 +41,8 @@ test('capturas de la app', async ({ page }) => {
   await page.screenshot({ path: 'capturas/03-firma.png' });
   await page.getByRole('button', { name: 'Cancelar' }).click();
 
-  await page.getByRole('button', { name: 'Descartar' }).click().catch(() => {});
   page.on('dialog', (d) => void d.accept());
+  await page.getByRole('button', { name: 'Descartar' }).click();
 
   await page.getByRole('button', { name: 'Salir' }).click();
   await entrar(page, CREDENCIALES.pd);
@@ -52,4 +52,12 @@ test('capturas de la app', async ({ page }) => {
   await page.goto('/#/');
   await page.getByRole('link', { name: 'Para revisar' }).click();
   await page.screenshot({ path: 'capturas/05-bandeja.png', fullPage: true });
+
+  // el ABM del catálogo: la empresa edita su propio manual
+  await page.getByRole('link', { name: 'Catálogo' }).click();
+  await page.screenshot({ path: 'capturas/06-catalogo.png', fullPage: true });
+
+  await page.getByRole('link', { name: /RO-05C/ }).click();
+  await expect(page.getByRole('heading', { name: /Editar RO-05C/ })).toBeVisible();
+  await page.screenshot({ path: 'capturas/07-editor.png', fullPage: true });
 });

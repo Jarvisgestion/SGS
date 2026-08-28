@@ -60,6 +60,10 @@ asesor externo) aparece la solapa **Catálogo**:
 
 ## Decisiones que conviene conocer
 
+- **Los borradores son de cada persona, no del equipo.** IndexedDB es del
+  dispositivo: en una tablet compartida a bordo, sin separarlos el borrador del
+  capitán le aparecería al siguiente que entre, y al sincronizarlo tierra lo
+  rechazaría por rol.
 - **Los booleanos arrancan sin contestar**, no en "No". Un registro no puede
   afirmar "no se informó a PNA" porque nadie tocó ese campo.
 - **Un registro observado vuelve a bordo como borrador** con sus datos y sus

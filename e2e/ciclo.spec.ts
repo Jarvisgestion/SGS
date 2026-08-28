@@ -151,6 +151,31 @@ test.describe('sin señal', () => {
   });
 });
 
+test('en una tablet compartida, cada persona ve sólo sus borradores', async ({ page, context }) => {
+  await entrar(page, CREDENCIALES.capitan);
+  await page.getByRole('link', { name: /RE-01A-INC/ }).click();
+
+  // sin señal para que el borrador quede pendiente de subir
+  await context.setOffline(true);
+  await page.getByLabel(/Tema tratado/).fill('Zafarrancho mensual de incendio');
+  await page.waitForURL(/#\/borrador\//);
+  await page.getByRole('link', { name: 'A bordo' }).click();
+  await expect(page.getByText(/borrador sin subir/)).toBeVisible();
+
+  // entra otra persona en el mismo equipo: el borrador del capitán no es suyo
+  await salir(page);
+  await context.setOffline(false);
+  await entrar(page, CREDENCIALES.pd);
+  await expect(page.getByText(/borrador sin subir/)).toBeHidden();
+  await expect(page.getByText(/Tierra rechazó/)).toBeHidden();
+
+  // y al capitán lo sigue esperando donde lo dejó
+  await salir(page);
+  await entrar(page, CREDENCIALES.capitan);
+  await page.getByRole('button', { name: 'Mis registros' }).click();
+  await expect(page.locator('a[href^="#/borrador/"]')).toContainText('RE-01A-INC');
+});
+
 test('el tablero muestra el cumplimiento y los desvíos', async ({ page }) => {
   await entrar(page, CREDENCIALES.pd);
   await page.getByRole('link', { name: 'Cumplimiento' }).click();

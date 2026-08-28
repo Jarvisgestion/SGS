@@ -8,6 +8,7 @@ class SinSenal extends Error {}
 function borrador(patch: Partial<Draft> = {}): Draft {
   return {
     localId: 'local-1',
+    userId: 'u1',
     companyId: 'c1',
     recordTypeId: 'rt1',
     recordTypeCode: 'RE-01D',
