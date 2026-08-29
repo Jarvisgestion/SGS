@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, ApiError, currentSession, OfflineError, setSession, type RecordTypeSummary, type Rol, type Session, type Vessel } from './lib/api.ts';
+import { api, ApiError, currentSession, OfflineError, setSession, type RecordTypeSummary, type Riesgo, type Rol, type Session, type Tripulante, type Vessel } from './lib/api.ts';
 import { dependenciasDeSync } from './lib/deps.ts';
 import { buquePorDefecto, navegaABordo, trabajaEnTierra } from './lib/roles.ts';
 import { ir, useEnLinea, useRuta } from './lib/router.ts';
@@ -19,6 +19,8 @@ export interface Contexto {
   recordTypes: RecordTypeSummary[];
   vessels: Vessel[];
   roles: Rol[];
+  riesgos: Riesgo[];
+  tripulacion: Tripulante[];
   borradores: Draft[];
   recargarBorradores(): Promise<void>;
   refrescarCatalogo(): Promise<void>;
@@ -31,6 +33,8 @@ export function App() {
   const [recordTypes, setRecordTypes] = useState<RecordTypeSummary[]>([]);
   const [vessels, setVessels] = useState<Vessel[]>([]);
   const [roles, setRoles] = useState<Rol[]>([]);
+  const [riesgos, setRiesgos] = useState<Riesgo[]>([]);
+  const [tripulacion, setTripulacion] = useState<Tripulante[]>([]);
   const [borradores, setBorradores] = useState<Draft[]>([]);
   const [avisoSync, setAvisoSync] = useState<string | null>(null);
   const enLinea = useEnLinea();
@@ -50,17 +54,25 @@ export function App() {
    */
   const refrescarCatalogo = useCallback(async () => {
     try {
-      const [tipos, buques, rolesApi] = await Promise.all([
+      const [tipos, buques, rolesApi, riesgosApi, tripulacionApi] = await Promise.all([
         api.recordTypes(),
         api.vessels(),
         api.roles(),
+        api.riesgos(),
+        api.tripulacion(),
       ]);
       setRecordTypes(tipos.record_types);
       setVessels(buques.vessels);
       setRoles(rolesApi.roles);
+      setRiesgos(riesgosApi.risks);
+      setTripulacion(tripulacionApi.crew);
       await cache.set('record_types', tipos.record_types);
       await cache.set('vessels', buques.vessels);
       await cache.set('roles', rolesApi.roles);
+      // La matriz y la tripulación también se guardan: un acaecimiento se carga
+      // fuera de cobertura y tiene que poder citar el cuadro que corresponde.
+      await cache.set('riesgos', riesgosApi.risks);
+      await cache.set('tripulacion', tripulacionApi.crew);
       await precargarFormularios(tipos.record_types);
     } catch (err) {
       if (!(err instanceof OfflineError)) console.warn('no se pudo refrescar el catálogo', err);
@@ -70,14 +82,18 @@ export function App() {
   useEffect(() => {
     if (!session) return;
     void (async () => {
-      const [tiposCache, buquesCache, rolesCache] = await Promise.all([
+      const [tiposCache, buquesCache, rolesCache, riesgosCache, tripulacionCache] = await Promise.all([
         cache.get<RecordTypeSummary[]>('record_types'),
         cache.get<Vessel[]>('vessels'),
         cache.get<Rol[]>('roles'),
+        cache.get<Riesgo[]>('riesgos'),
+        cache.get<Tripulante[]>('tripulacion'),
       ]);
       if (tiposCache) setRecordTypes(tiposCache);
       if (buquesCache) setVessels(buquesCache);
       if (rolesCache) setRoles(rolesCache);
+      if (riesgosCache) setRiesgos(riesgosCache);
+      if (tripulacionCache) setTripulacion(tripulacionCache);
       await refrescarCatalogo();
     })();
     void recargarBorradores();
@@ -125,6 +141,8 @@ export function App() {
     recordTypes,
     vessels,
     roles,
+    riesgos,
+    tripulacion,
     borradores,
     recargarBorradores,
     refrescarCatalogo,
@@ -166,7 +184,7 @@ export function App() {
             </a>
           </>
         )}
-        {session.user.can_manage_catalog && (
+        {(session.user.can_manage_catalog || session.user.can_manage_risk) && (
           <a href="#/admin" className={ruta[0] === 'admin' ? 'activo' : ''}>
             Catálogo
           </a>
@@ -210,13 +228,19 @@ function Pantalla({ ruta, ctx }: { ruta: string[]; ctx: Contexto }) {
       return <Bandeja ctx={ctx} />;
     case 'tablero':
       return <Tablero />;
-    case 'admin':
-      if (!ctx.session.user.can_manage_catalog) {
+    case 'admin': {
+      const { can_manage_catalog: catalogo, can_manage_risk: riesgo } = ctx.session.user;
+      if (!catalogo && !riesgo) {
         return <p className="vacio">Tu rol no habilita a editar el catálogo.</p>;
       }
-      if (parametro === 'formulario') return <EditorFormulario ctx={ctx} recordTypeId={ruta[2]!} />;
-      if (parametro === 'nuevo-formulario') return <EditorFormulario ctx={ctx} procedureId={ruta[2]!} />;
+      if (catalogo && parametro === 'formulario') {
+        return <EditorFormulario ctx={ctx} recordTypeId={ruta[2]!} />;
+      }
+      if (catalogo && parametro === 'nuevo-formulario') {
+        return <EditorFormulario ctx={ctx} procedureId={ruta[2]!} />;
+      }
       return <Catalogo ctx={ctx} />;
+    }
     default:
       return <p className="vacio">No encontramos esa pantalla.</p>;
   }

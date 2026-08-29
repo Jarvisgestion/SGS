@@ -303,6 +303,8 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
               value={borrador.data[f.key]}
               error={intentoEnviar ? erroresPorCampo.get(f.key) : undefined}
               guardarArchivo={(archivo) => guardarArchivo(f.key, archivo)}
+              riesgos={ctx.riesgos}
+              tripulacion={ctx.tripulacion}
               onChange={(v) => cambiar(f.key, v)}
             />
           ))}

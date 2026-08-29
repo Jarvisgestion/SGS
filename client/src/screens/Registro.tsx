@@ -129,7 +129,15 @@ export function Registro({ ctx, id }: { ctx: Contexto; id: string }) {
         {registro.field_schema
           .filter((f: Field) => f.type !== 'signature_block')
           .map((f: Field) => (
-            <CampoDinamico key={f.key} field={f} value={registro.data[f.key]} readOnly onChange={() => {}} />
+            <CampoDinamico
+              key={f.key}
+              field={f}
+              value={registro.data[f.key]}
+              riesgos={ctx.riesgos}
+              tripulacion={ctx.tripulacion}
+              readOnly
+              onChange={() => {}}
+            />
           ))}
       </section>
 

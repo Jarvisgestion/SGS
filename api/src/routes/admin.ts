@@ -70,6 +70,20 @@ const vesselBody = z.object({
   status: z.enum(['activo', 'inactivo', 'retirado_de_servicio']).optional(),
 });
 
+const riskBody = z.object({
+  vessel_id: z.string().uuid().nullish(),
+  chart_number: z.string().nullish(),
+  work_position: z.string().min(1),
+  hazard_source: z.string().min(1),
+  probability: z.number().int().min(1).max(3),
+  consequence: z.number().int().min(1).max(3),
+  control_measures: z.string().nullish(),
+  responsible_user_id: z.string().uuid().nullish(),
+  due_date: z.string().date().nullish(),
+  residual_probability: z.number().int().min(1).max(3).nullish(),
+  residual_consequence: z.number().int().min(1).max(3).nullish(),
+});
+
 const userBody = z.object({
   full_name: z.string().min(1),
   email: z.string().email().nullish(),
@@ -82,6 +96,10 @@ const userBody = z.object({
 
 export async function adminRoutes(app: FastifyInstance) {
   app.addHook('preHandler', async (req) => {
+    // La matriz de riesgo tiene su propio permiso: el Responsable de Seguridad
+    // e Higiene la mantiene sin administrar el resto del catálogo.
+    const esRiesgo = req.url.includes('/admin/risks');
+
     const { rows } = await app.db.query<{ puede: boolean }>(
       `SELECT EXISTS (
          SELECT 1 FROM user_roles ur
@@ -89,11 +107,17 @@ export async function adminRoutes(app: FastifyInstance) {
         WHERE ur.user_id = $1 AND ur.company_id = $2
           AND ur.valid_from <= current_date
           AND (ur.valid_to IS NULL OR ur.valid_to >= current_date)
-          AND r.can_manage_catalog) AS puede`,
-      [req.user.id, req.companyId],
+          AND ($3::boolean IS TRUE AND r.can_manage_risk OR $3::boolean IS FALSE AND r.can_manage_catalog)
+       ) AS puede`,
+      [req.user.id, req.companyId, esRiesgo],
     );
     if (!rows[0]?.puede) {
-      throw new HttpError(403, 'Tu rol no habilita a editar el catálogo de esta empresa');
+      throw new HttpError(
+        403,
+        esRiesgo
+          ? 'Tu rol no habilita a editar la matriz de riesgo de esta empresa'
+          : 'Tu rol no habilita a editar el catálogo de esta empresa',
+      );
     }
   });
 
@@ -318,6 +342,75 @@ export async function adminRoutes(app: FastifyInstance) {
         ],
       );
       if (!rows[0]) throw new HttpError(404, 'Buque inexistente');
+      return rows[0];
+    });
+  });
+
+  // --- matriz de riesgo (PO-08) ---------------------------------------------
+
+  app.post('/risks', async (req, reply) => {
+    const body = riskBody.parse(req.body);
+    const row = await withTransaction(app.db, req.user.id, async (tx) => {
+      const { rows } = await tx.query(
+        `INSERT INTO risk_assessments
+           (company_id, vessel_id, chart_number, work_position, hazard_source,
+            probability, consequence, control_measures, responsible_user_id, due_date,
+            residual_probability, residual_consequence)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         RETURNING *, risk_level(risk_score) AS risk_level`,
+        [
+          req.companyId,
+          body.vessel_id ?? null,
+          body.chart_number ?? null,
+          body.work_position,
+          body.hazard_source,
+          body.probability,
+          body.consequence,
+          body.control_measures ?? null,
+          body.responsible_user_id ?? null,
+          body.due_date ?? null,
+          body.residual_probability ?? null,
+          body.residual_consequence ?? null,
+        ],
+      );
+      return rows[0];
+    });
+    return reply.code(201).send(row);
+  });
+
+  app.patch('/risks/:id', async (req) => {
+    const { id } = idParam.parse(req.params);
+    const body = riskBody.partial().extend({ status: z.enum(['vigente', 'revisado', 'cerrado']).optional() }).parse(req.body);
+
+    return withTransaction(app.db, req.user.id, async (tx) => {
+      const { rows } = await tx.query(
+        `UPDATE risk_assessments
+            SET chart_number = COALESCE($3, chart_number),
+                work_position = COALESCE($4, work_position),
+                hazard_source = COALESCE($5, hazard_source),
+                probability = COALESCE($6, probability),
+                consequence = COALESCE($7, consequence),
+                control_measures = COALESCE($8, control_measures),
+                residual_probability = COALESCE($9, residual_probability),
+                residual_consequence = COALESCE($10, residual_consequence),
+                status = COALESCE($11::risk_status, status)
+          WHERE id = $1 AND company_id = $2
+          RETURNING *, risk_level(risk_score) AS risk_level`,
+        [
+          id,
+          req.companyId,
+          body.chart_number ?? null,
+          body.work_position ?? null,
+          body.hazard_source ?? null,
+          body.probability ?? null,
+          body.consequence ?? null,
+          body.control_measures ?? null,
+          body.residual_probability ?? null,
+          body.residual_consequence ?? null,
+          body.status ?? null,
+        ],
+      );
+      if (!rows[0]) throw new HttpError(404, 'Evaluación de riesgo inexistente');
       return rows[0];
     });
   });

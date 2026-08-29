@@ -52,6 +52,8 @@ autenticación, para el chequeo del balanceador.
 | `GET` | `/catalog/record-types` | Catálogo de la empresa |
 | `GET` | `/catalog/record-types/:id` | Definición del formulario (`field_schema`) |
 | `GET` | `/catalog/vessels` | Buques de la empresa |
+| `GET` | `/catalog/risks` | Matriz de riesgo vigente (PO-08) |
+| `GET` | `/catalog/crew` | Tripulación, para los campos que citan a una persona |
 | `POST` | `/records` | Alta de un registro (nace en borrador) |
 | `GET` | `/records` | Listado con filtros (estado, buque, tipo, fechas) |
 | `GET` | `/records/:id` | Detalle: datos, formulario congelado, firmas y revisiones |
@@ -70,6 +72,7 @@ autenticación, para el chequeo del balanceador.
 | `GET/POST/PATCH` | `/admin/procedures` | Procedimientos del manual |
 | `POST/PATCH` | `/admin/record-types` | Alta y edición de formularios |
 | `POST/PATCH` | `/admin/vessels` | Flota |
+| `POST/PATCH` | `/admin/risks` | Matriz de evaluación de riesgos |
 | `GET/POST/PATCH` | `/admin/users` | Personas |
 | `POST/DELETE` | `/admin/users/:id/roles` | Asignar y cerrar roles |
 
@@ -93,6 +96,11 @@ autenticación, para el chequeo del balanceador.
   checksum guardado es el de lo que realmente se escribió.
 - **El tipo de archivo se verifica contra los primeros bytes**, no contra lo
   que declara el navegador.
+- **La matriz de riesgo tiene su propio permiso** (`roles.can_manage_risk`,
+  migración 0011). El Responsable de Seguridad e Higiene la mantiene sin
+  administrar el resto del catálogo, y quien administra el catálogo no la toca
+  por el solo hecho de administrarlo. Se lee, en cambio, con cualquier rol: un
+  registro tiene que poder citar un cuadro aunque quien lo carga no lo edite.
 - **Quién puede editar el catálogo lo decide la base.** Las rutas `/admin`
   cortan antes para dar un error claro, pero el permiso está en un trigger
   (`roles.can_manage_catalog`, migración 0009): escribir por SQL con un usuario

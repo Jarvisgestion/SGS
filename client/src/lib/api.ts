@@ -34,6 +34,7 @@ export interface Session {
     companies: string[];
     roles: { code: string; companyId: string; vesselId: string | null }[];
     can_manage_catalog: boolean;
+    can_manage_risk: boolean;
   };
 }
 
@@ -173,6 +174,31 @@ export interface RecordTypeInput {
   status?: 'vigente' | 'derogado';
 }
 
+/** Un "Cuadro" de la matriz de evaluación de riesgos (PO-08). */
+export interface Riesgo {
+  id: string;
+  chart_number: string | null;
+  work_position: string;
+  hazard_source: string;
+  probability: number;
+  consequence: number;
+  risk_score: number;
+  risk_level: 'bajo' | 'medio' | 'alto';
+  control_measures: string | null;
+  residual_score: number | null;
+  residual_level: 'bajo' | 'medio' | 'alto' | null;
+  vessel_id: string | null;
+  vessel_name: string | null;
+  status: string;
+}
+
+export interface Tripulante {
+  id: string;
+  full_name: string;
+  dni: string | null;
+  roles: string | null;
+}
+
 export interface Vessel {
   id: string;
   name: string;
@@ -244,6 +270,14 @@ export const api = {
   vessels: () => request<{ vessels: Vessel[] }>('GET', '/catalog/vessels'),
 
   roles: () => request<{ roles: Rol[] }>('GET', '/catalog/roles'),
+
+  riesgos: () => request<{ risks: Riesgo[] }>('GET', '/catalog/risks'),
+
+  tripulacion: (vesselId?: string) =>
+    request<{ crew: Tripulante[] }>(
+      'GET',
+      `/catalog/crew${vesselId ? `?vessel_id=${vesselId}` : ''}`,
+    ),
 
   records: (query: Record<string, string | number | undefined> = {}) => {
     const qs = new URLSearchParams(
@@ -354,6 +388,11 @@ export const admin = {
     request<{ id: string; version: number }>('PATCH', `/admin/record-types/${id}`, body),
 
   crearBuque: (body: Record<string, unknown>) => request<Vessel>('POST', '/admin/vessels', body),
+
+  crearRiesgo: (body: Record<string, unknown>) => request<Riesgo>('POST', '/admin/risks', body),
+
+  editarRiesgo: (id: string, body: Record<string, unknown>) =>
+    request<Riesgo>('PATCH', `/admin/risks/${id}`, body),
 
   editarBuque: (id: string, body: Record<string, unknown>) =>
     request<Vessel>('PATCH', `/admin/vessels/${id}`, body),

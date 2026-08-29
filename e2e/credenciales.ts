@@ -3,4 +3,6 @@
 export const CREDENCIALES = {
   capitan: { email: 'capitan@e2e.test', password: 'clave-de-prueba-123', pin: '4821' },
   pd: { email: 'pd@e2e.test', password: 'clave-de-prueba-123', pin: '9134' },
+  tripulante: { email: 'marinero@e2e.test', password: 'clave-de-prueba-123', pin: '7788' },
+  sh: { email: 'sh@e2e.test', password: 'clave-de-prueba-123', pin: '2233' },
 };

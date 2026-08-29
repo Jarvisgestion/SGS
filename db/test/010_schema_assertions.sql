@@ -439,7 +439,7 @@ BEGIN
   INSERT INTO risk_assessments (company_id, chart_number, work_position, hazard_source,
                                 probability, consequence, control_measures,
                                 residual_probability, residual_consequence)
-  VALUES (cid, 'Cuadro N° 7', 'Jefe de Máquinas', 'Superficies calientes en sala de máquinas',
+  VALUES (cid, 'Cuadro N° 99', 'Jefe de Máquinas', 'Superficies calientes en sala de máquinas',
           3, 3, 'Aislación térmica, EPP, señalización', 1, 2)
   RETURNING id INTO ra;
 

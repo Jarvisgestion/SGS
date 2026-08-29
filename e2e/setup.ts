@@ -39,6 +39,8 @@ async function crear(nombre: string, cred: { email: string; password: string; pi
 
 await crear('Capitán de prueba', CREDENCIALES.capitan, 'capitan', BUQUE);
 await crear('Persona Designada', CREDENCIALES.pd, 'persona_designada', null);
+await crear('Marinero de cubierta', CREDENCIALES.tripulante, 'tripulante', BUQUE);
+await crear('Responsable de S&H', CREDENCIALES.sh, 'responsable_sh', null);
 
 // Un certificado vencido, para que el tablero tenga algo que mostrar.
 await db.query(

@@ -67,6 +67,8 @@ export interface CurrentUser {
   roles: { code: string; companyId: string; vesselId: string | null }[];
   /** Alguno de sus roles vigentes habilita a editar el catálogo. */
   canManageCatalog: boolean;
+  /** ... y a mantener la matriz de riesgo, que es un permiso aparte. */
+  canManageRisk: boolean;
 }
 
 export async function loadUser(db: Db, userId: string): Promise<CurrentUser> {
@@ -76,14 +78,21 @@ export async function loadUser(db: Db, userId: string): Promise<CurrentUser> {
     company_id: string | null;
     status: string;
     roles:
-      | { code: string; company_id: string; vessel_id: string | null; can_manage_catalog: boolean }[]
+      | {
+          code: string;
+          company_id: string;
+          vessel_id: string | null;
+          can_manage_catalog: boolean;
+          can_manage_risk: boolean;
+        }[]
       | null;
   }>(
     `SELECT u.id, u.full_name, u.company_id, u.status,
             (SELECT json_agg(json_build_object('code', ur.role_code,
                                                'company_id', ur.company_id,
                                                'vessel_id', ur.vessel_id,
-                                               'can_manage_catalog', r.can_manage_catalog))
+                                               'can_manage_catalog', r.can_manage_catalog,
+                                               'can_manage_risk', r.can_manage_risk))
                FROM user_roles ur
                JOIN roles r ON r.code = ur.role_code
               WHERE ur.user_id = u.id
@@ -114,5 +123,6 @@ export async function loadUser(db: Db, userId: string): Promise<CurrentUser> {
     companies,
     roles,
     canManageCatalog: (row.roles ?? []).some((r) => r.can_manage_catalog),
+    canManageRisk: (row.roles ?? []).some((r) => r.can_manage_risk),
   };
 }

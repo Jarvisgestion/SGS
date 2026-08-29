@@ -51,6 +51,7 @@ export async function authRoutes(app: FastifyInstance) {
         companies: user.companies,
         roles: user.roles,
         can_manage_catalog: user.canManageCatalog,
+        can_manage_risk: user.canManageRisk,
       },
     };
   });

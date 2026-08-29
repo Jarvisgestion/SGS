@@ -16,6 +16,8 @@ import {
   type TableRow,
 } from '../lib/schema.ts';
 
+import type { Riesgo, Tripulante } from '../lib/api.ts';
+
 interface Props {
   field: Field;
   value: FieldValue;
@@ -23,16 +25,19 @@ interface Props {
   readOnly?: boolean;
   /** Guarda un archivo y devuelve su referencia (local o de tierra). */
   guardarArchivo?: (archivo: File) => Promise<string>;
+  /** Matriz de riesgo y tripulación, para los campos que las referencian. */
+  riesgos?: Riesgo[];
+  tripulacion?: Tripulante[];
   onChange(value: FieldValue): void;
 }
 
 /** Campos que no son un control único sino un grupo de botones o una tabla. */
 const AGRUPADOS = new Set(['boolean', 'multiselect', 'checklist', 'table']);
 
-export function CampoDinamico({ field, value, error, readOnly, guardarArchivo, onChange }: Props) {
+export function CampoDinamico({ field, value, error, readOnly, guardarArchivo, riesgos, tripulacion, onChange }: Props) {
   const esGrupo = AGRUPADOS.has(field.type);
   const idEtiqueta = `${field.key}-label`;
-  const interno = control({ field, value, error, readOnly, guardarArchivo, onChange });
+  const interno = control({ field, value, error, readOnly, guardarArchivo, riesgos, tripulacion, onChange });
 
   return (
     <div className="campo">
@@ -53,10 +58,44 @@ export function CampoDinamico({ field, value, error, readOnly, guardarArchivo, o
   );
 }
 
-function control({ field, value, readOnly, guardarArchivo, onChange }: Props) {
+function control({ field, value, readOnly, guardarArchivo, riesgos, tripulacion, onChange }: Props) {
   const ro = readOnly ?? false;
 
   switch (field.type) {
+    /**
+     * Referencia a un cuadro de la matriz de riesgo (PO-08). Es lo que hace que
+     * "Cuadro N° 7" en un acaecimiento sea un enlace de verdad y no un texto
+     * que hay que ir a buscar al anexo en papel.
+     */
+    case 'risk_reference':
+      return (
+        <ReferenciaRiesgo
+          id={field.key}
+          value={value ? String(value) : ''}
+          readOnly={ro}
+          riesgos={riesgos ?? []}
+          onChange={onChange}
+        />
+      );
+
+    case 'user_reference':
+      return (
+        <select
+          id={field.key}
+          value={String(value ?? '')}
+          disabled={ro}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          <option value="">— Elegir —</option>
+          {(tripulacion ?? []).map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.full_name}
+              {p.dni ? ` (DNI ${p.dni})` : ''}
+            </option>
+          ))}
+        </select>
+      );
+
     case 'file':
       return (
         <CampoArchivo
@@ -376,6 +415,59 @@ function TablaFilas({
         >
           Agregar fila
         </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Selector de la matriz de riesgo. Muestra el nivel del cuadro elegido, que es
+ * el dato que se mira al evaluar un hecho.
+ */
+function ReferenciaRiesgo({
+  id,
+  value,
+  readOnly,
+  riesgos,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  readOnly: boolean;
+  riesgos: Riesgo[];
+  onChange(v: string): void;
+}) {
+  const elegido = riesgos.find((r) => r.id === value);
+
+  return (
+    <div>
+      <select id={id} value={value} disabled={readOnly} onChange={(e) => onChange(e.target.value)}>
+        <option value="">— Elegir —</option>
+        {riesgos.map((r) => (
+          <option key={r.id} value={r.id}>
+            {[r.chart_number, r.work_position, r.hazard_source].filter(Boolean).join(' · ')}
+          </option>
+        ))}
+      </select>
+
+      {elegido && (
+        <div style={{ marginTop: 8, fontSize: 14, color: 'var(--tenue)' }}>
+          <span className={`chip ${elegido.risk_level === 'alto' ? 'vencido' : elegido.risk_level === 'medio' ? 'por_vencer' : 'al_dia'}`}>
+            Riesgo {elegido.risk_level}
+          </span>{' '}
+          (probabilidad {elegido.probability} × consecuencia {elegido.consequence})
+          {elegido.control_measures && (
+            <>
+              <br />
+              Medidas de control: {elegido.control_measures}
+            </>
+          )}
+        </div>
+      )}
+      {!elegido && value && (
+        <p className="error">
+          El cuadro referenciado ya no está en la matriz vigente.
+        </p>
       )}
     </div>
   );

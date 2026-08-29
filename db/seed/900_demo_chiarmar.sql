@@ -190,3 +190,24 @@ VALUES
    {"key":"novedades","type":"textarea","label":"Novedades"},
    {"key":"firma_guardia","type":"signature_block","label":"Firma del guardia","signer_role":"guardia_puerto"}]'::jsonb)
 ON CONFLICT DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- Matriz de evaluación de riesgos (PO-08 Anexo)
+--
+-- Tres cuadros de muestra: son los que RO-07A y RE-01 referencian cuando hay
+-- que decir qué riesgo aplicaba al hecho.
+-- ---------------------------------------------------------------------------
+INSERT INTO risk_assessments (company_id, vessel_id, chart_number, work_position, hazard_source,
+                              probability, consequence, control_measures,
+                              residual_probability, residual_consequence)
+VALUES
+  ('11111111-1111-1111-1111-111111111111', NULL, 'Cuadro N° 1', 'Cubierta',
+   'Caída al mar durante la maniobra de largado del arte de pesca', 2, 3,
+   'Chaleco de trabajo, líneas de vida, prohibición de operar en solitario', 1, 3),
+  ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'Cuadro N° 7',
+   'Jefe de Máquinas', 'Superficies calientes y partes móviles en sala de máquinas', 3, 3,
+   'Aislación térmica, protecciones mecánicas, EPP y señalización', 1, 2),
+  ('11111111-1111-1111-1111-111111111111', NULL, 'Cuadro N° 12', 'Cocina',
+   'Quemaduras por líquidos calientes con buque en movimiento', 2, 2,
+   'Sujeción de ollas, guantes térmicos, calzado antideslizante', 1, 2)
+ON CONFLICT DO NOTHING;

@@ -46,9 +46,12 @@ incompleto.
 
 ## La empresa edita su propio manual
 
-Con un rol habilitado (`roles.can_manage_catalog`: armador, Persona Designada,
-asesor externo) aparece la solapa **Catálogo**:
+Con un rol habilitado (`roles.can_manage_catalog` o `can_manage_risk`) aparece
+la solapa **Catálogo**, con lo que ese rol puede editar y nada más:
 
+- **Matriz de riesgo** — los cuadros de PO-08, con su valoración y sus medidas
+  de control. Es lo que citan los acaecimientos y los siniestros. La mantiene el
+  Responsable de Seguridad e Higiene, que entra sólo a esta solapa.
 - **Manual** — revisiones del MGS y sus procedimientos. Poner una revisión en
   vigencia deja la anterior superada, y sus formularios dejan de ofrecerse a
   bordo; los registros ya cargados se siguen leyendo con el suyo.
@@ -84,9 +87,7 @@ asesor externo) aparece la solapa **Catálogo**:
 
 ## Pendientes
 
-1. **Campos `risk_reference` y `user_reference`**: hoy se editan como texto;
-   falta el selector contra la matriz de riesgo y contra la tripulación.
-2. **Crear el registro hijo** que dispara otro registro (hoy la app avisa cuál
+1. **Crear el registro hijo** que dispara otro registro (hoy la app avisa cuál
    corresponde cargar, pero no lo encadena solo).
 3. **Elegir buque cuando la persona tiene rol en varios** está resuelto con un
    desplegable; falta el caso del asesor externo que opera varias empresas

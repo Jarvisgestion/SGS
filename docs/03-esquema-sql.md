@@ -53,6 +53,10 @@ Estas reglas están como constraints o triggers, y todas tienen su aserción en
   agregue `WHERE company_id = ...`.
 - **Alcance del registro.** `scope = vessel` exige `vessel_id`; `scope = company`
   lo prohíbe.
+- **Quién mantiene la matriz de riesgo.** `roles.can_manage_risk` (migración
+  0011) y un trigger sobre `risk_assessments`. Es un permiso aparte del
+  catálogo: la matriz es del Responsable de Seguridad e Higiene, que no
+  necesariamente administra el manual.
 - **Quién puede editar el catálogo.** `roles.can_manage_catalog` (migración
   0009) y triggers sobre `manual_versions`, `procedures`, `record_types` y
   `vessels`. Cuando no hay actor declarado —migraciones, seeds, scripts— no se
@@ -102,20 +106,26 @@ tiene que estar completo y bien tipado.
 2. **Escala de la matriz de riesgo** — hoy 1–3 × 1–3 (§2). Si el anexo de PO-08
    de Xeitosiño o Pesantar usa otra escala, es una migración de una línea sobre
    el CHECK, pero conviene confirmarlo antes de cargar datos.
-3. **Catálogo real de Xeitosiño y Pesantar** — sigue siendo el punto 1 y 2 de
+3. **Quién puede firmar un bloque declarado para otro rol.** Hoy cualquiera con
+   sesión puede firmar cualquier bloque del formulario: la firma queda a su
+   nombre, pero nada impide que el Capitán firme el bloque de la Persona
+   Designada. No se resolvió porque varios `signer_role` no son puestos sino
+   roles del acto de firmar (entrega, recibe, conforme), que nadie "tiene" como
+   rol asignado — hace falta una definición antes de poner una regla.
+4. **Catálogo real de Xeitosiño y Pesantar** — sigue siendo el punto 1 y 2 de
    los próximos pasos de `02-modelo-de-datos.md`, y el que valida de verdad que
    el modelo no quedó calcado de Chiarmar. Lo que sí está resuelto ahora es que
    cargar un catálogo distinto es `INSERT`, no migración.
-4. **Autenticación y RLS** — `users.password_hash` / `pin_hash` son
+5. **Autenticación y RLS** — `users.password_hash` / `pin_hash` son
    marcadores de posición: falta decidir el proveedor de identidad. Y si la API
    va a conectarse con un rol de base por empresa, corresponde agregar Row
    Level Security sobre `company_id`; el esquema ya tiene la columna en todas
    las tablas operativas para poder hacerlo sin rediseño.
-5. **API y cliente.** La capa HTTP está en `api/` y la aplicación en
+6. **API y cliente.** La capa HTTP está en `api/` y la aplicación en
    `client/`: el ciclo del registro y el ABM del catálogo están implementados y
    probados contra la base real. Falta la subida de archivos y poder duplicar
    una revisión del manual al crear la siguiente.
-6. **Retención y borrado** — hay FKs `ON DELETE RESTRICT` en lo que no debería
+7. **Retención y borrado** — hay FKs `ON DELETE RESTRICT` en lo que no debería
    poder borrarse (una empresa con registros, un tipo de registro con
    instancias). Falta la política formal de cuánto se conserva un registro
    aprobado.

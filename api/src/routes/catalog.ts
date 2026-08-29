@@ -77,6 +77,53 @@ export async function catalogRoutes(app: FastifyInstance) {
     return { roles: rows };
   });
 
+  /**
+   * Matriz de riesgo de la empresa (PO-08). Es de lectura para todos: el
+   * campo `risk_reference` de un registro tiene que poder elegir un cuadro
+   * aunque quien carga no administre la matriz.
+   */
+  app.get('/risks', async (req) => {
+    const q = z.object({ vessel_id: z.string().uuid().optional() }).parse(req.query);
+    const { rows } = await app.db.query(
+      `SELECT ra.id, ra.chart_number, ra.work_position, ra.hazard_source,
+              ra.probability, ra.consequence, ra.risk_score, risk_level(ra.risk_score) AS risk_level,
+              ra.control_measures, ra.residual_score, risk_level(ra.residual_score) AS residual_level,
+              ra.vessel_id, v.name AS vessel_name, ra.status
+         FROM risk_assessments ra
+         LEFT JOIN vessels v ON v.id = ra.vessel_id
+        WHERE ra.company_id = $1
+          AND ra.status <> 'cerrado'
+          AND ($2::uuid IS NULL OR ra.vessel_id IS NULL OR ra.vessel_id = $2)
+        ORDER BY ra.chart_number NULLS LAST, ra.work_position`,
+      [req.companyId, q.vessel_id ?? null],
+    );
+    return { risks: rows };
+  });
+
+  /**
+   * Quiénes están embarcados, para los campos que referencian a una persona
+   * (el tripulante afectado en un acaecimiento médico, por ejemplo).
+   */
+  app.get('/crew', async (req) => {
+    const q = z.object({ vessel_id: z.string().uuid().optional() }).parse(req.query);
+    const { rows } = await app.db.query(
+      `SELECT u.id, u.full_name, u.dni,
+              (SELECT string_agg(DISTINCT ur.role_code, ', ')
+                 FROM user_roles ur
+                WHERE ur.user_id = u.id AND ur.valid_to IS NULL
+                  AND ($2::uuid IS NULL OR ur.vessel_id IS NULL OR ur.vessel_id = $2)) AS roles
+         FROM users u
+        WHERE u.company_id = $1 AND u.status = 'activo'
+          AND ($2::uuid IS NULL OR EXISTS (
+                SELECT 1 FROM user_roles ur
+                 WHERE ur.user_id = u.id AND ur.valid_to IS NULL
+                   AND (ur.vessel_id = $2 OR ur.vessel_id IS NULL)))
+        ORDER BY u.full_name`,
+      [req.companyId, q.vessel_id ?? null],
+    );
+    return { crew: rows };
+  });
+
   app.get('/vessels', async (req) => {
     const { rows } = await app.db.query(
       `SELECT id, name, matricula, vessel_type, service, specific_operation, status, specs

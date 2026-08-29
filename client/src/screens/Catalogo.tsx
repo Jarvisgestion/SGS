@@ -9,23 +9,31 @@ import {
 } from '../lib/api.ts';
 import { ir } from '../lib/router.ts';
 
-type Solapa = 'manual' | 'formularios' | 'flota' | 'personas';
+type Solapa = 'manual' | 'formularios' | 'flota' | 'personas' | 'riesgos';
 
 /** ABM del catálogo: es lo que permite que la empresa maneje su propio manual. */
 export function Catalogo({ ctx }: { ctx: Contexto }) {
-  const [solapa, setSolapa] = useState<Solapa>('formularios');
+  const puedeCatalogo = ctx.session.user.can_manage_catalog;
+  const puedeRiesgo = ctx.session.user.can_manage_risk;
+
+  // El Responsable de Seguridad e Higiene entra sólo a la matriz.
+  const solapas: [Solapa, string][] = [
+    ...(puedeCatalogo
+      ? ([
+          ['formularios', 'Formularios'],
+          ['manual', 'Manual'],
+          ['flota', 'Flota'],
+          ['personas', 'Personas'],
+        ] as [Solapa, string][])
+      : []),
+    ...(puedeRiesgo ? ([['riesgos', 'Matriz de riesgo']] as [Solapa, string][]) : []),
+  ];
+  const [solapa, setSolapa] = useState<Solapa>(solapas[0]![0]);
 
   return (
     <>
       <div className="si-no" style={{ marginBottom: 12, flexWrap: 'wrap' }}>
-        {(
-          [
-            ['formularios', 'Formularios'],
-            ['manual', 'Manual'],
-            ['flota', 'Flota'],
-            ['personas', 'Personas'],
-          ] as const
-        ).map(([clave, texto]) => (
+        {solapas.map(([clave, texto]) => (
           <button key={clave} type="button" aria-pressed={solapa === clave} onClick={() => setSolapa(clave)}>
             {texto}
           </button>
@@ -36,6 +44,141 @@ export function Catalogo({ ctx }: { ctx: Contexto }) {
       {solapa === 'manual' && <Manual />}
       {solapa === 'flota' && <Flota ctx={ctx} />}
       {solapa === 'personas' && <Personas ctx={ctx} />}
+      {solapa === 'riesgos' && <MatrizDeRiesgo ctx={ctx} />}
+    </>
+  );
+}
+
+/**
+ * Matriz de evaluación de riesgos (PO-08). Es la que referencian los
+ * acaecimientos y los siniestros cuando hay que decir qué riesgo aplicaba.
+ */
+function MatrizDeRiesgo({ ctx }: { ctx: Contexto }) {
+  const [error, setError] = useState<string | null>(null);
+  const [nuevo, setNuevo] = useState({
+    chart_number: '',
+    work_position: '',
+    hazard_source: '',
+    probability: '2',
+    consequence: '2',
+    control_measures: '',
+  });
+
+  async function crear() {
+    try {
+      await admin.crearRiesgo({
+        chart_number: nuevo.chart_number.trim() || null,
+        work_position: nuevo.work_position.trim(),
+        hazard_source: nuevo.hazard_source.trim(),
+        probability: Number(nuevo.probability),
+        consequence: Number(nuevo.consequence),
+        control_measures: nuevo.control_measures.trim() || null,
+      });
+      setNuevo({ ...nuevo, chart_number: '', work_position: '', hazard_source: '', control_measures: '' });
+      setError(null);
+      await ctx.refrescarCatalogo();
+    } catch (err) {
+      setError(mensajeDeError(err));
+    }
+  }
+
+  async function cerrar(id: string) {
+    try {
+      await admin.editarRiesgo(id, { status: 'cerrado' });
+      await ctx.refrescarCatalogo();
+    } catch (err) {
+      setError(mensajeDeError(err));
+    }
+  }
+
+  return (
+    <>
+      <section className="panel">
+        <h2>Cuadros vigentes</h2>
+        {ctx.riesgos.length === 0 ? (
+          <p className="vacio">La matriz está vacía.</p>
+        ) : (
+          <ul className="lista">
+            {ctx.riesgos.map((r) => (
+              <li key={r.id}>
+                <span className="fila" style={{ display: 'flex', padding: '14px 4px', gap: 10, flexWrap: 'wrap' }}>
+                  <span className="titulo">
+                    {r.chart_number && <span className="codigo">{r.chart_number} · </span>}
+                    {r.work_position}
+                    <br />
+                    {r.hazard_source}
+                    <br />
+                    <small style={{ color: 'var(--tenue)' }}>
+                      {r.vessel_name ?? 'Toda la compañía'} · probabilidad {r.probability} × consecuencia{' '}
+                      {r.consequence}
+                      {r.residual_level ? ` · residual ${r.residual_level}` : ''}
+                    </small>
+                  </span>
+                  <span className={`chip ${r.risk_level === 'alto' ? 'vencido' : r.risk_level === 'medio' ? 'por_vencer' : 'al_dia'}`}>
+                    {r.risk_level}
+                  </span>
+                  <button
+                    type="button"
+                    className="boton secundario"
+                    style={{ minHeight: 36, padding: '4px 12px' }}
+                    onClick={() => void cerrar(r.id)}
+                  >
+                    Cerrar
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p style={{ color: 'var(--tenue)', fontSize: 14 }}>
+          Cerrar un cuadro lo saca de la matriz vigente. Los registros que ya lo citaron lo siguen
+          citando: la evaluación que aplicó en su momento no cambia.
+        </p>
+      </section>
+
+      <section className="panel">
+        <h2>Nuevo cuadro</h2>
+        {error && <div className="aviso error">{error}</div>}
+        <div className="campo">
+          <label htmlFor="cuadro">Número de cuadro</label>
+          <input id="cuadro" type="text" placeholder="Cuadro N° 21" value={nuevo.chart_number}
+                 onChange={(e) => setNuevo({ ...nuevo, chart_number: e.target.value })} />
+        </div>
+        <div className="campo">
+          <label htmlFor="puesto">Puesto de trabajo</label>
+          <input id="puesto" type="text" value={nuevo.work_position}
+                 onChange={(e) => setNuevo({ ...nuevo, work_position: e.target.value })} />
+        </div>
+        <div className="campo">
+          <label htmlFor="fuente">Fuente generadora del riesgo</label>
+          <textarea id="fuente" value={nuevo.hazard_source}
+                    onChange={(e) => setNuevo({ ...nuevo, hazard_source: e.target.value })} />
+        </div>
+        <div className="campo">
+          <label htmlFor="prob">Probabilidad (1 a 3)</label>
+          <select id="prob" value={nuevo.probability} onChange={(e) => setNuevo({ ...nuevo, probability: e.target.value })}>
+            <option value="1">1 — baja</option>
+            <option value="2">2 — media</option>
+            <option value="3">3 — alta</option>
+          </select>
+        </div>
+        <div className="campo">
+          <label htmlFor="cons">Consecuencia (1 a 3)</label>
+          <select id="cons" value={nuevo.consequence} onChange={(e) => setNuevo({ ...nuevo, consequence: e.target.value })}>
+            <option value="1">1 — leve</option>
+            <option value="2">2 — moderada</option>
+            <option value="3">3 — grave</option>
+          </select>
+        </div>
+        <div className="campo">
+          <label htmlFor="medidas">Medidas de control</label>
+          <textarea id="medidas" value={nuevo.control_measures}
+                    onChange={(e) => setNuevo({ ...nuevo, control_measures: e.target.value })} />
+        </div>
+        <button type="button" className="boton secundario" onClick={() => void crear()}>
+          Agregar cuadro
+        </button>
+      </section>
     </>
   );
 }
