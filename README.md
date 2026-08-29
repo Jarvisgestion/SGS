@@ -68,6 +68,11 @@ de ponerlo en manos de un cliente están en [`DEPLOY.md`](DEPLOY.md).
 
 ## Verificación
 
+Todo esto corre solo en cada push (`.github/workflows/ci.yml`): tipos, las
+cuatro suites y la prueba de resguardo, con PostgreSQL 16 y Chromium reales.
+
+
+
 ```bash
 ./scripts/db-test.sh          # aserciones del esquema sobre una base descartable
 cd api    && npm test         # ciclo del registro contra la base real
