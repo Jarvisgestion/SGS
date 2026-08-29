@@ -61,15 +61,19 @@ export function setSession(next: Session | null) {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  // Con FormData no se declara el content-type: lo pone el navegador junto con
+  // el separador que necesita el multipart.
+  const esFormulario = body instanceof FormData;
+
   let res: Response;
   try {
     res = await fetch(`${BASE}${path}`, {
       method,
       headers: {
-        ...(body ? { 'content-type': 'application/json' } : {}),
+        ...(body && !esFormulario ? { 'content-type': 'application/json' } : {}),
         ...(session ? { authorization: `Bearer ${session.token}` } : {}),
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body: esFormulario ? body : body ? JSON.stringify(body) : undefined,
     });
   } catch {
     throw new OfflineError();
@@ -130,7 +134,7 @@ export interface ManualVersion {
   regulation: string | null;
   effective_date: string | null;
   status: 'borrador' | 'vigente' | 'superada';
-  procedimientos: string;
+  procedimientos: number;
 }
 
 export interface Procedure {
@@ -140,7 +144,7 @@ export interface Procedure {
   name: string;
   sort_order: number;
   status: string;
-  registros: string;
+  registros: number;
 }
 
 export interface UsuarioAdmin {
@@ -176,6 +180,15 @@ export interface Vessel {
   status: string;
 }
 
+export interface Adjunto {
+  id: string;
+  file_name: string | null;
+  file_type: string;
+  content_type: string;
+  byte_size: number;
+  uploaded_at: string;
+}
+
 export interface RecordSummary {
   id: string;
   record_type_code: string;
@@ -201,7 +214,15 @@ export interface RecordDetail {
   occurred_at: string;
   data: FormData;
   signatures:
-    | { id: string; signer_name: string; signer_role: string; field_key: string; method: string; signed_at: string }[]
+    | {
+        id: string;
+        signer_name: string;
+        signer_role: string;
+        field_key: string;
+        method: string;
+        signed_at: string;
+        signature_image_id: string | null;
+      }[]
     | null;
   reviews:
     | { id: string; decision: string; comment: string | null; reviewed_at: string; reviewer: string | null }[]
@@ -252,8 +273,26 @@ export const api = {
   submitRecord: (id: string) =>
     request<{ id: string; status: RecordStatus }>('POST', `/records/${id}/submit`),
 
-  addAttachment: (id: string, body: { file_url: string; file_type: string; file_name?: string }) =>
-    request<{ id: string }>('POST', `/records/${id}/attachments`, body),
+  /** Sube un adjunto (foto, copia de mail, imagen de firma) al registro. */
+  subirAdjunto: (recordId: string, archivo: Blob, nombre: string) => {
+    const form = new FormData();
+    form.append('archivo', archivo, nombre);
+    return request<Adjunto>('POST', `/records/${recordId}/attachments`, form);
+  },
+
+  /**
+   * Descarga un adjunto. Va por fetch y no por la URL directa porque hace
+   * falta el token: los adjuntos no son públicos.
+   */
+  descargarAdjunto: async (id: string): Promise<Blob> => {
+    const res = await fetch(`${BASE}/attachments/${id}`, {
+      headers: session ? { authorization: `Bearer ${session.token}` } : {},
+    }).catch(() => {
+      throw new OfflineError();
+    });
+    if (!res.ok) throw new ApiError(res.status, 'No se pudo abrir el adjunto');
+    return res.blob();
+  },
 
   sign: (
     id: string,

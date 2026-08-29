@@ -17,6 +17,10 @@ export interface Config {
   trustProxy: boolean;
   /** Intentos de login por minuto y por combinación de IP + cuenta. */
   loginRateLimit: number;
+  /** Carpeta de los archivos adjuntos. Tiene que ser un volumen persistente. */
+  storageDir: string;
+  /** Tamaño máximo de un adjunto, en bytes. */
+  maxUploadBytes: number;
 }
 
 const RAIZ = path.resolve(import.meta.dirname, '..', '..');
@@ -40,5 +44,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     clientDir: existsSync(path.join(clientDir, 'index.html')) ? clientDir : null,
     trustProxy: env.SGS_TRUST_PROXY === 'true',
     loginRateLimit: Number(env.SGS_LOGIN_RATE_LIMIT ?? 10),
+    storageDir: env.SGS_STORAGE_DIR ?? path.join(RAIZ, 'var', 'attachments'),
+    maxUploadBytes: Number(env.SGS_MAX_UPLOAD_BYTES ?? 10 * 1024 * 1024),
   };
 }

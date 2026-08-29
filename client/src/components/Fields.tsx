@@ -4,6 +4,7 @@
  * cada empresa define.
  */
 import type { ChangeEvent } from 'react';
+import { CampoArchivo } from './Adjunto.tsx';
 import {
   CHECKLIST_LABELS,
   label,
@@ -20,16 +21,18 @@ interface Props {
   value: FieldValue;
   error?: string;
   readOnly?: boolean;
+  /** Sube un archivo y devuelve el id del adjunto. Sin esto, no se puede adjuntar. */
+  subirArchivo?: (archivo: File) => Promise<string>;
   onChange(value: FieldValue): void;
 }
 
 /** Campos que no son un control único sino un grupo de botones o una tabla. */
 const AGRUPADOS = new Set(['boolean', 'multiselect', 'checklist', 'table']);
 
-export function CampoDinamico({ field, value, error, readOnly, onChange }: Props) {
+export function CampoDinamico({ field, value, error, readOnly, subirArchivo, onChange }: Props) {
   const esGrupo = AGRUPADOS.has(field.type);
   const idEtiqueta = `${field.key}-label`;
-  const interno = control({ field, value, error, readOnly, onChange });
+  const interno = control({ field, value, error, readOnly, subirArchivo, onChange });
 
   return (
     <div className="campo">
@@ -50,10 +53,21 @@ export function CampoDinamico({ field, value, error, readOnly, onChange }: Props
   );
 }
 
-function control({ field, value, readOnly, onChange }: Props) {
+function control({ field, value, readOnly, subirArchivo, onChange }: Props) {
   const ro = readOnly ?? false;
 
   switch (field.type) {
+    case 'file':
+      return (
+        <CampoArchivo
+          id={field.key}
+          value={value ? String(value) : undefined}
+          readOnly={ro}
+          subir={subirArchivo}
+          onChange={(v) => onChange(v ?? '')}
+        />
+      );
+
     case 'textarea':
       return (
         <textarea

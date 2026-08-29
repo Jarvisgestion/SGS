@@ -1,5 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { rm } from 'node:fs/promises';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
@@ -18,11 +20,16 @@ export interface TestContext {
   app: FastifyInstance;
   db: Db;
   dbName: string;
+  almacenamiento: string;
 }
 
 /** Base descartable con migraciones y seed aplicados. */
-export async function setupApi(opciones?: { loginRateLimit?: number }): Promise<TestContext> {
+export async function setupApi(opciones?: {
+  loginRateLimit?: number;
+  maxUploadBytes?: number;
+}): Promise<TestContext> {
   const dbName = `sgs_api_test_${randomUUID().slice(0, 8)}`;
+  const almacenamiento = path.join(os.tmpdir(), dbName);
   execFileSync('createdb', [dbName], { stdio: 'inherit' });
   execFileSync(path.join(repoRoot, 'scripts/db-apply.sh'), ['--with-seed'], {
     env: { ...process.env, PGDATABASE: dbName, DATABASE_URL: '' },
@@ -40,17 +47,20 @@ export async function setupApi(opciones?: { loginRateLimit?: number }): Promise<
       clientDir: null, // en los tests sólo importa la API
       trustProxy: false,
       loginRateLimit: opciones?.loginRateLimit ?? 1000,
+      storageDir: almacenamiento,
+      maxUploadBytes: opciones?.maxUploadBytes ?? 10 * 1024 * 1024,
     },
     db,
   });
   await app.ready();
-  return { app, db, dbName };
+  return { app, db, dbName, almacenamiento };
 }
 
 export async function teardownApi(ctx: TestContext) {
   await ctx.app.close();
   await ctx.db.end();
   execFileSync('dropdb', ['--force', ctx.dbName], { stdio: 'inherit' });
+  await rm(ctx.almacenamiento, { recursive: true, force: true });
 }
 
 export interface SeededUser {
@@ -110,4 +120,30 @@ export async function recordTypeId(db: Db, code: string): Promise<string> {
     [code, DEMO_COMPANY],
   );
   return rows[0]!.id;
+}
+
+/** PNG de 1x1 transparente: sirve como archivo real y pesa nada. */
+export const PNG_1x1 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+/** Arma un cuerpo multipart para app.inject, sin dependencias extra. */
+export function multipart(
+  archivo: Buffer,
+  opciones: { filename: string; contentType: string; campo?: string },
+) {
+  const limite = `----sgs${randomUUID()}`;
+  const cabecera = Buffer.from(
+    `--${limite}\r\n` +
+      `Content-Disposition: form-data; name="${opciones.campo ?? 'archivo'}"; ` +
+      `filename="${opciones.filename}"\r\n` +
+      `Content-Type: ${opciones.contentType}\r\n\r\n`,
+  );
+  const cierre = Buffer.from(`\r\n--${limite}--\r\n`);
+
+  return {
+    payload: Buffer.concat([cabecera, archivo, cierre]),
+    headers: { 'content-type': `multipart/form-data; boundary=${limite}` },
+  };
 }

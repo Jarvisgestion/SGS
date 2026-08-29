@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { verifySecret } from '../auth.ts';
 import { withTransaction } from '../db.ts';
 import { HttpError } from '../errors.ts';
+import { ContenidoNoCoincide, describirTipo, TipoNoAceptado } from '../storage.ts';
 
 const createBody = z.object({
   record_type_id: z.string().uuid(),
@@ -44,14 +45,6 @@ const signatureBody = z.object({
 const reviewBody = z.object({
   decision: z.enum(['aprobado', 'observado']),
   comment: z.string().trim().optional(),
-});
-
-const attachmentBody = z.object({
-  file_url: z.string().min(1),
-  file_name: z.string().optional(),
-  file_type: z.enum(['pdf', 'image', 'email', 'other']),
-  byte_size: z.number().int().positive().optional(),
-  checksum: z.string().optional(),
 });
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -136,7 +129,8 @@ export async function recordRoutes(app: FastifyInstance) {
               rt.signature_requirement, rtv.field_schema,
               (SELECT json_agg(json_build_object(
                         'id', s.id, 'signer_name', s.signer_name, 'signer_role', s.signer_role,
-                        'field_key', s.field_key, 'method', s.method, 'signed_at', s.signed_at)
+                        'field_key', s.field_key, 'method', s.method, 'signed_at', s.signed_at,
+                        'signature_image_id', s.signature_image_id)
                       ORDER BY s.signed_at)
                  FROM signatures s WHERE s.record_instance_id = ri.id) AS signatures,
               (SELECT json_agg(json_build_object(
@@ -306,29 +300,57 @@ export async function recordRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Alta del metadato de un adjunto (foto, copia de mail, imagen de firma).
-   * La subida del archivo al almacenamiento es responsabilidad del cliente:
-   * acá sólo se registra la referencia. Ver README, "Pendientes".
+   * Subida de un adjunto: foto del hecho, copia de un mail, imagen de firma.
+   *
+   * El archivo va al almacenamiento y en la base queda su referencia. El tipo
+   * declarado se verifica contra los primeros bytes del archivo: lo que diga
+   * el navegador no alcanza.
    */
   app.post('/:id/attachments', async (req, reply) => {
     const { id } = idParam.parse(req.params);
-    const body = attachmentBody.parse(req.body);
+
+    const parte = await req.file();
+    if (!parte) throw new HttpError(400, 'No llegó ningún archivo');
+
+    const contenido = await parte.toBuffer().catch((err: Error & { code?: string }) => {
+      if (err.code === 'FST_REQ_FILE_TOO_LARGE') {
+        throw new HttpError(
+          413,
+          `El archivo supera el máximo de ${Math.round(app.config.maxUploadBytes / 1024 / 1024)} MB`,
+        );
+      }
+      throw err;
+    });
+    if (contenido.byteLength === 0) throw new HttpError(400, 'El archivo está vacío');
+
+    let tipo;
+    try {
+      tipo = describirTipo(parte.mimetype, contenido);
+    } catch (err) {
+      if (err instanceof TipoNoAceptado || err instanceof ContenidoNoCoincide) {
+        throw new HttpError(415, err.message);
+      }
+      throw err;
+    }
+
+    const guardado = await app.almacenamiento.guardar(contenido, tipo.extension);
 
     const row = await withTransaction(app.db, req.user.id, async (tx) => {
       await lockInstance(tx, id, req.companyId);
       const { rows } = await tx.query(
-        `INSERT INTO attachments (company_id, record_instance_id, file_url, file_name,
-                                  file_type, byte_size, checksum, uploaded_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING id, file_url, file_type, uploaded_at`,
+        `INSERT INTO attachments (company_id, record_instance_id, storage_key, file_name,
+                                  file_type, content_type, byte_size, checksum, uploaded_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING id, file_name, file_type, content_type, byte_size, uploaded_at`,
         [
           req.companyId,
           id,
-          body.file_url,
-          body.file_name ?? null,
-          body.file_type,
-          body.byte_size ?? null,
-          body.checksum ?? null,
+          guardado.storageKey,
+          parte.filename ?? null,
+          tipo.categoria,
+          parte.mimetype,
+          guardado.byteSize,
+          guardado.checksum,
           req.user.id,
         ],
       );

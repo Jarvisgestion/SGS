@@ -1,4 +1,5 @@
 import helmet from '@fastify/helmet';
+import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -6,11 +7,13 @@ import { ZodError } from 'zod';
 import { loadUser, verifyToken, type CurrentUser } from './auth.ts';
 import type { Config } from './config.ts';
 import { createPool, type Db } from './db.ts';
+import { AlmacenamientoEnDisco, type Almacenamiento } from './storage.ts';
 import { HttpError, toHttpError } from './errors.ts';
 import { adminRoutes } from './routes/admin.ts';
 import { authRoutes } from './routes/auth.ts';
 import { catalogRoutes } from './routes/catalog.ts';
 import { dashboardRoutes } from './routes/dashboard.ts';
+import { attachmentRoutes } from './routes/attachments.ts';
 import { recordRoutes } from './routes/records.ts';
 
 declare module 'fastify' {
@@ -22,6 +25,7 @@ declare module 'fastify' {
   interface FastifyInstance {
     db: Db;
     config: Config;
+    almacenamiento: Almacenamiento;
   }
 }
 
@@ -29,13 +33,20 @@ export interface AppOptions {
   config: Config;
   db?: Db;
   logger?: boolean;
+  almacenamiento?: Almacenamiento;
 }
 
-export async function buildApp({ config, db, logger = false }: AppOptions): Promise<FastifyInstance> {
+export async function buildApp({
+  config,
+  db,
+  logger = false,
+  almacenamiento,
+}: AppOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger, bodyLimit: 2 * 1024 * 1024, trustProxy: config.trustProxy });
 
   app.decorate('db', db ?? createPool(config.databaseUrl));
   app.decorate('config', config);
+  app.decorate('almacenamiento', almacenamiento ?? new AlmacenamientoEnDisco(config.storageDir));
   app.decorateRequest('user', null as unknown as CurrentUser);
   app.decorateRequest('companyId', '');
 
@@ -69,6 +80,7 @@ export async function buildApp({ config, db, logger = false }: AppOptions): Prom
 
   // hook preHandler: el limitador necesita el body para distinguir por cuenta.
   await app.register(rateLimit, { global: false, hook: 'preHandler' });
+  await app.register(multipart, { limits: { fileSize: config.maxUploadBytes, files: 1 } });
 
   /** Para el balanceador: fuera del prefijo y sin autenticación. */
   app.get('/health', async () => {
@@ -99,6 +111,7 @@ export async function buildApp({ config, db, logger = false }: AppOptions): Prom
         secured.register(catalogRoutes, { prefix: '/catalog' });
         secured.register(recordRoutes, { prefix: '/records' });
         secured.register(dashboardRoutes, { prefix: '/dashboard' });
+        secured.register(attachmentRoutes, { prefix: '/attachments' });
         secured.register(adminRoutes, { prefix: '/admin' });
       });
     },

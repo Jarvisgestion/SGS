@@ -25,6 +25,11 @@ COPY api ./api
 COPY db ./db
 COPY --from=cliente /app/client/dist ./client/dist
 
+# Los adjuntos se guardan acá. Tiene que ser un volumen: si no, se pierden en
+# cada despliegue (ver DEPLOY.md).
+RUN mkdir -p /app/var/attachments && chown -R node:node /app/var
+VOLUME ["/app/var/attachments"]
+
 USER node
 EXPOSE 3000
 

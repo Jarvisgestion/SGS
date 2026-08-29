@@ -13,7 +13,15 @@ interface Props {
   signerRole: string;
   requirement: SignatureRequirement;
   onCancel(): void;
-  onSign(input: { pin?: string; imageDataUrl?: string; method?: 'canvas' | 'pin' }): Promise<void>;
+  onSign(input: { pin?: string; imagen?: Blob; method?: 'canvas' | 'pin' }): Promise<void>;
+}
+
+/** El trazo se sube como archivo PNG, no como texto embebido en el registro. */
+function comoPng(canvas: HTMLCanvasElement | null): Promise<Blob | undefined> {
+  return new Promise((resolve) => {
+    if (!canvas) return resolve(undefined);
+    canvas.toBlob((blob) => resolve(blob ?? undefined), 'image/png');
+  });
 }
 
 export function SignaturePad({ fieldLabel, signerRole, requirement, onCancel, onSign }: Props) {
@@ -99,7 +107,7 @@ export function SignaturePad({ fieldLabel, signerRole, requirement, onCancel, on
     try {
       await onSign({
         pin: pidePin ? pin : undefined,
-        imageDataUrl: pideTrazo ? canvasRef.current?.toDataURL('image/png') : undefined,
+        imagen: pideTrazo ? await comoPng(canvasRef.current) : undefined,
         method: elegible ? metodo : undefined,
       });
     } catch (err) {

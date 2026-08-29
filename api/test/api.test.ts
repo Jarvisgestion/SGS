@@ -3,6 +3,8 @@ import { after, before, describe, it } from 'node:test';
 import {
   auth,
   createUser,
+  multipart,
+  PNG_1x1,
   DEMO_COMPANY,
   DEMO_VESSEL,
   login,
@@ -291,13 +293,15 @@ describe('ciclo de vida de un registro', () => {
     });
     assert.equal(sinImagen.statusCode, 422);
 
+    const cuerpo = multipart(PNG_1x1, { filename: 'firma.png', contentType: 'image/png' });
     const adjunto = await ctx.app.inject({
       method: 'POST',
       url: `/api/records/${recordId}/attachments`,
-      headers: auth(capitanToken),
-      payload: { file_url: 's3://firmas/cap.png', file_type: 'image' },
+      headers: { ...auth(capitanToken), ...cuerpo.headers },
+      payload: cuerpo.payload,
     });
     assert.equal(adjunto.statusCode, 201);
+    assert.equal(adjunto.json().byte_size, PNG_1x1.byteLength);
     firmaId = adjunto.json().id;
 
     const pinMal = await ctx.app.inject({

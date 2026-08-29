@@ -71,16 +71,20 @@ asesor externo) aparece la solapa **Catálogo**:
   la del capitán sigue valiendo sobre el registro corregido. Si PNA exigiera
   volver a firmar tras una corrección, hay que cambiar el esquema (hoy lo impide
   un índice único), no el cliente.
-- **La imagen de la firma viaja como data URL** hasta que haya almacenamiento de
-  archivos (ver `api/README.md`).
+- **La firma se sube como archivo PNG**, igual que cualquier otro adjunto: no
+  queda incrustada en el registro.
+- **Adjuntar una foto exige señal.** El resto del formulario se completa sin
+  cobertura, pero un archivo no se puede guardar en el borrador local y subir
+  después; la app lo dice en vez de aceptarlo y perderlo.
 - **El service worker sólo cachea el armazón de la app.** Los datos viven en
   IndexedDB; `/api` nunca se cachea, para no mostrar un estado viejo como si
   fuera el actual.
 
 ## Pendientes
 
-1. **Adjuntar fotos** desde la cámara (el campo `file` del esquema todavía no
-   tiene control propio en el formulario).
+1. **Adjuntar fotos sin señal**: hoy el campo de archivo pide conexión. Para
+   resolverlo hay que guardar el archivo en el dispositivo y subirlo con el
+   resto del borrador.
 2. **Campos `risk_reference` y `user_reference`**: hoy se editan como texto;
    falta el selector contra la matriz de riesgo y contra la tripulación.
 3. **Crear el registro hijo** que dispara otro registro (hoy la app avisa cuál

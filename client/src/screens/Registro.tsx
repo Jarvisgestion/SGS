@@ -5,6 +5,7 @@ import { ir } from '../lib/router.ts';
 import { trabajaEnTierra } from '../lib/roles.ts';
 import { emptyForm, label, type Field } from '../lib/schema.ts';
 import { drafts, newDraft } from '../store/drafts.ts';
+import { AdjuntoImagen } from '../components/Adjunto.tsx';
 import { CampoDinamico } from '../components/Fields.tsx';
 
 const ETIQUETA_ESTADO: Record<string, string> = {
@@ -147,6 +148,11 @@ export function Registro({ ctx, id }: { ctx: Contexto; id: string }) {
                   {f.method === 'pin' ? 'Confirmado con PIN' : 'Firma manuscrita'} ·{' '}
                   {new Date(f.signed_at).toLocaleString('es-AR')}
                 </small>
+                {f.signature_image_id && (
+                  <div style={{ marginTop: 6 }}>
+                    <AdjuntoImagen id={f.signature_image_id} alto={90} />
+                  </div>
+                )}
               </span>
             </div>
           ))

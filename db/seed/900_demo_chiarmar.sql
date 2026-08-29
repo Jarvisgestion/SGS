@@ -114,6 +114,7 @@ VALUES
     "options":["Corte suministro eléctrico","Cierre de ventilación","Puertas corta fuego","Puertas estancas"]},
    {"key":"elementos_usados","type":"checklist","label":"Elementos de lucha contra incendio",
     "options":["E.R.A","Mangueras de incendio","Extintores","Equipo de CO2","Traje de bombero"]},
+   {"key":"foto","type":"file","label":"Foto del siniestro"},
    {"key":"informa_compania","type":"boolean","label":"Se informa a Compañía"},
    {"key":"informa_pna","type":"boolean","label":"Se informa a PNA"},
    {"key":"hubo_heridos","type":"boolean","label":"Hubo heridos","triggers_record_type":"RO-07A"},

@@ -1,10 +1,13 @@
 import pg from 'pg';
 
 /**
- * `numeric` llega como string por defecto; para este dominio (cantidades,
- * horómetros) alcanza y sobra con number.
+ * `numeric` y `bigint` llegan como string por defecto, porque pueden exceder
+ * lo que un number representa con exactitud. En este dominio no: son
+ * cantidades, horómetros, tamaños de archivo y conteos. Que salgan como número
+ * evita que la API devuelva `"registros": "3"` en el JSON.
  */
-pg.types.setTypeParser(1700, (v) => Number(v));
+pg.types.setTypeParser(1700, (v) => Number(v)); // numeric
+pg.types.setTypeParser(20, (v) => Number(v)); // int8 / bigint
 
 export type Db = pg.Pool;
 export type Tx = pg.PoolClient;

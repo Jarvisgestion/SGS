@@ -32,7 +32,15 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
   const [firmando, setFirmando] = useState<Field | null>(null);
   const [enviando, setEnviando] = useState(false);
   const guardado = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const ultimo = useRef<Draft | null>(null);
+  /**
+   * Última versión del borrador, para que los manejadores no trabajen sobre lo
+   * que había cuando se dibujó la pantalla. Subir una foto tarda: si mientras
+   * tanto se toca otro campo, el estado que ve ese manejador ya quedó viejo, y
+   * con él se perdía el id que había dado tierra — el registro terminaba
+   * creándose dos veces.
+   */
+  const actual = useRef<Draft | null>(null);
+  const descartado = useRef(false);
 
   // --- carga del tipo de registro y del borrador --------------------------
   useEffect(() => {
@@ -66,9 +74,9 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
   /** Guardado local con retardo: escribir en cada tecla castiga a la tablet. */
   const guardarLocal = useCallback(
     (siguiente: Draft) => {
+      actual.current = siguiente;
       setBorrador(siguiente);
       if (guardado.current) clearTimeout(guardado.current);
-      ultimo.current = siguiente;
       guardado.current = setTimeout(() => {
         void drafts.save(siguiente).then(() => ctx.recargarBorradores());
         // Al primer dato cargado la URL pasa a apuntar al borrador: si la app
@@ -90,9 +98,9 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
    */
   useEffect(() => {
     function volcar() {
-      if (!ultimo.current) return;
+      if (!actual.current || descartado.current) return;
       if (guardado.current) clearTimeout(guardado.current);
-      void drafts.save(ultimo.current);
+      void drafts.save(actual.current);
     }
     window.addEventListener('pagehide', volcar);
     document.addEventListener('visibilitychange', volcar);
@@ -102,6 +110,8 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
       volcar();
     };
   }, []);
+
+  actual.current = borrador;
 
   const errores = useMemo(
     () => (tipo && borrador ? validateForm(tipo.field_schema, borrador.data) : []),
@@ -117,14 +127,16 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
   const disparados = triggeredRecordTypes(tipo.field_schema, borrador.data);
 
   function cambiar(key: string, value: unknown) {
-    guardarLocal({ ...borrador!, data: { ...borrador!.data, [key]: value }, dirty: true });
+    const base = actual.current!;
+    guardarLocal({ ...base, data: { ...base.data, [key]: value }, dirty: true });
   }
 
   /** Sube el borrador y devuelve el id que le dio tierra. La firma lo necesita. */
-  async function asegurarEnTierra(actual: Draft): Promise<Draft> {
-    if (actual.serverId && !actual.dirty) return actual;
+  async function asegurarEnTierra(): Promise<Draft> {
+    const base = actual.current!;
+    if (base.serverId && !base.dirty) return base;
 
-    const payload = { ...actual, data: toPayload(tipo!.field_schema, actual.data) };
+    const payload = { ...base, data: toPayload(tipo!.field_schema, base.data) };
     const salida = await syncDraft(payload, {
       createRecord: api.createRecord,
       updateRecord: api.updateRecord,
@@ -133,24 +145,28 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
     if (salida.result === 'offline') throw new OfflineError();
     if (salida.result === 'rejected') throw new ApiError(422, salida.error);
 
-    const actualizado = { ...actual, serverId: salida.draft.serverId, dirty: false };
+    // Se parte de actual.current y no de `base`: mientras subía, alguien pudo
+    // seguir completando el formulario.
+    const actualizado = { ...actual.current!, serverId: salida.draft.serverId, dirty: false };
+    actual.current = actualizado;
     await drafts.save(actualizado);
     setBorrador(actualizado);
     return actualizado;
   }
 
-  async function firmar(bloque: Field, entrada: { pin?: string; imageDataUrl?: string; method?: 'canvas' | 'pin' }) {
-    const conId = await asegurarEnTierra(borrador!);
+  /** Sube un archivo al registro, creándolo en tierra si todavía no existía. */
+  async function subirArchivo(archivo: File): Promise<string> {
+    const conId = await asegurarEnTierra();
+    const adjunto = await api.subirAdjunto(conId.serverId!, archivo, archivo.name);
+    return adjunto.id;
+  }
+
+  async function firmar(bloque: Field, entrada: { pin?: string; imagen?: Blob; method?: 'canvas' | 'pin' }) {
+    const conId = await asegurarEnTierra();
 
     let imagenId: string | undefined;
-    if (entrada.imageDataUrl) {
-      // Provisorio: la imagen viaja como data URL hasta que haya almacenamiento
-      // de archivos (ver api/README.md, "Pendientes").
-      const adjunto = await api.addAttachment(conId.serverId!, {
-        file_url: entrada.imageDataUrl,
-        file_type: 'image',
-        file_name: `firma-${bloque.key}.png`,
-      });
+    if (entrada.imagen) {
+      const adjunto = await api.subirAdjunto(conId.serverId!, entrada.imagen, `firma-${bloque.key}.png`);
       imagenId = adjunto.id;
     }
 
@@ -166,7 +182,8 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
       if (!(err instanceof ApiError) || err.status !== 409) throw err;
     }
 
-    const firmado = { ...conId, signedKeys: [...conId.signedKeys, bloque.key] };
+    const firmado = { ...actual.current!, signedKeys: [...conId.signedKeys, bloque.key] };
+    actual.current = firmado;
     await drafts.save(firmado);
     setBorrador(firmado);
     setFirmando(null);
@@ -182,11 +199,11 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
 
     setEnviando(true);
     try {
-      const conId = await asegurarEnTierra(borrador!);
+      const conId = await asegurarEnTierra();
       await api.submitRecord(conId.serverId!);
       // Se corta el autoguardado antes de borrar: si no, al desmontarse la
       // pantalla el volcado pendiente reviviría el borrador ya enviado.
-      ultimo.current = null;
+      descartado.current = true;
       if (guardado.current) clearTimeout(guardado.current);
       await drafts.remove(conId.localId);
       await ctx.recargarBorradores();
@@ -200,7 +217,7 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
 
   async function descartar() {
     if (!confirm('¿Descartar este borrador? No se puede deshacer.')) return;
-    ultimo.current = null;
+    descartado.current = true;
     if (guardado.current) clearTimeout(guardado.current);
     await drafts.remove(borrador!.localId);
     await ctx.recargarBorradores();
@@ -250,6 +267,7 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
               field={f}
               value={borrador.data[f.key]}
               error={intentoEnviar ? erroresPorCampo.get(f.key) : undefined}
+              subirArchivo={ctx.enLinea ? subirArchivo : undefined}
               onChange={(v) => cambiar(f.key, v)}
             />
           ))}

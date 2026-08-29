@@ -18,6 +18,8 @@ service worker no se registra y la app deja de funcionar fuera de cobertura.
 | `PORT` | no | 3000 por defecto. |
 | `SGS_SESSION_TTL` | no | Duración de la sesión en segundos (12 horas por defecto). |
 | `SGS_LOGIN_RATE_LIMIT` | no | Intentos de login por minuto por IP + cuenta (10 por defecto). |
+| `SGS_STORAGE_DIR` | no | Carpeta de los adjuntos. En la imagen es `/app/var/attachments`, y **tiene que ser un volumen persistente**. |
+| `SGS_MAX_UPLOAD_BYTES` | no | Tamaño máximo de un adjunto (10 MB por defecto). |
 | `SGS_CLIENT_DIR` | no | Dónde está el build de la app. En la imagen ya viene resuelto. |
 
 ## En un servidor propio
@@ -52,6 +54,21 @@ En Fly, `fly launch --no-deploy` genera el `fly.toml`: hay que dejar
 `internal_port = 3000` y agregarle el chequeo a `/health`. No dejamos un
 `fly.toml` en el repositorio a propósito — cambia con la región y el tamaño de
 máquina, y uno equivocado cuesta más tiempo que no tenerlo.
+
+## Los adjuntos necesitan un volumen
+
+Las fotos, las copias de mail y las imágenes de firma se guardan en disco, no
+en la base. `docker-compose.yml` ya define el volumen; en un servicio
+administrado hay que crearlo y montarlo en `/app/var/attachments` — el disco de
+un contenedor es efímero y sin volumen los adjuntos desaparecen en el siguiente
+despliegue, con los registros quedando firmados pero sin la evidencia.
+
+Entra en el backup igual que la base: un registro aprobado sin su foto adjunta
+está incompleto ante una inspección.
+
+> Para varias instancias corriendo a la vez, un volumen de disco no alcanza: ahí
+> hace falta un almacenamiento de objetos (S3 o compatible). La interfaz para
+> agregarlo está en `api/src/storage.ts`; hoy hay una sola implementación.
 
 ## Las migraciones corren solas
 
@@ -96,8 +113,7 @@ formularios, la flota y el resto del personal.
 2. **Confirmar `signature_requirement` con PNA.** Qué evidencia de firma acepta
    para cada tipo de registro sigue sin definirse; los valores actuales son un
    supuesto nuestro (`docs/03-esquema-sql.md` §6).
-3. **Almacenamiento de archivos.** Las imágenes de firma viajan hoy como data
-   URL dentro de la base. Funciona, pero para volumen real los adjuntos tienen
-   que ir a almacenamiento de objetos (`api/README.md`).
+3. **Backup del volumen de adjuntos**, junto con el de la base. Son parte del
+   mismo registro.
 4. **Retención.** Definir cuánto se conserva un registro aprobado y qué pasa al
    dar de baja una empresa.

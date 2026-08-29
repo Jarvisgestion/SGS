@@ -59,7 +59,8 @@ autenticación, para el chequeo del balanceador.
 | `POST` | `/records/:id/submit` | Envío a tierra |
 | `POST` | `/records/:id/signatures` | Firma de un bloque del formulario |
 | `POST` | `/records/:id/reviews` | Aprobar u observar |
-| `POST` | `/records/:id/attachments` | Registrar un adjunto |
+| `POST` | `/records/:id/attachments` | Subir un adjunto (multipart) |
+| `GET` | `/attachments/:id` | Descargar un adjunto |
 | `GET` | `/dashboard/compliance` | RA-06C: qué registros están al día |
 | `GET` | `/dashboard/pending-reviews` | Bandeja de revisión |
 | `GET` | `/dashboard/certificates` | RMGS-05: vencimientos |
@@ -74,11 +75,24 @@ autenticación, para el chequeo del balanceador.
 
 ## Cómo está armada
 
+> TypeScript corre directo con `node --experimental-strip-types`: Node **borra**
+> los tipos, no los transforma. Eso deja afuera las propiedades declaradas en el
+> constructor, los `enum` y los `namespace`; el resto se usa normalmente.
+
+
 - **Las reglas del dominio no se reimplementan acá.** Quién puede emitir un
   registro, si el formulario está completo, si un registro aprobado se puede
   editar — todo eso lo rechaza la base. `src/errors.ts` traduce el SQLSTATE a
   un HTTP con el mensaje de la base, que ya está escrito para que lo lea una
   persona. La API valida forma (zod) y orquesta; no duplica criterios.
+- **Los adjuntos no son públicos.** Se descargan por `GET /attachments/:id`
+  con sesión y filtrando por empresa, no por una URL directa del
+  almacenamiento: la foto de un accidente o un parte médico no deberían quedar
+  accesibles para cualquiera que tenga el enlace. La clave de cada archivo es
+  el sha256 de su contenido, así que dos copias iguales ocupan una sola y el
+  checksum guardado es el de lo que realmente se escribió.
+- **El tipo de archivo se verifica contra los primeros bytes**, no contra lo
+  que declara el navegador.
 - **Quién puede editar el catálogo lo decide la base.** Las rutas `/admin`
   cortan antes para dar un error claro, pero el permiso está en un trigger
   (`roles.can_manage_catalog`, migración 0009): escribir por SQL con un usuario
@@ -100,9 +114,10 @@ autenticación, para el chequeo del balanceador.
    proveedor definitivo (y con él, recuperación de contraseña, segundo factor
    para roles de tierra y rotación de PIN). Hoy las credenciales se cargan con
    `npm run credentials`.
-2. **Subida de archivos.** `POST /records/:id/attachments` registra la
-   referencia, no recibe el archivo. Falta elegir el almacenamiento (S3
-   compatible) y firmar URLs de subida.
+2. **Almacenamiento de objetos.** Los adjuntos van hoy a una carpeta del disco
+   (`src/storage.ts`). Alcanza para una instancia con un volumen persistente;
+   para varias corriendo a la vez hace falta S3 o compatible, que es un archivo
+   nuevo detrás de la misma interfaz.
 3. **Copiar una revisión del manual.** Al crear la Rev. 05 se arranca de cero:
    falta poder duplicar los procedimientos y formularios de la revisión anterior
    como punto de partida, que es como se trabaja en la práctica.

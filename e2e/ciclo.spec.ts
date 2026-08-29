@@ -58,6 +58,17 @@ test('el capitán carga un incendio, lo firma y lo envía; tierra lo observa y d
   await page.getByLabel('Hubo heridos').getByRole('button', { name: 'No' }).click();
   await page.getByLabel('Necesita remolque').getByRole('button', { name: 'No' }).click();
 
+  // --- foto del hecho: en el teléfono esto abre la cámara
+  await page.getByLabel('Foto del siniestro').setInputFiles({
+    name: 'siniestro.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  });
+  await expect(page.getByRole('img', { name: 'Adjunto' })).toBeVisible();
+
   // --- firma: este registro exige trazo Y PIN
   await page.getByRole('button', { name: 'Firmar', exact: true }).click();
   await firmarEnPantalla(page);
@@ -102,9 +113,11 @@ test('el capitán carga un incendio, lo firma y lo envía; tierra lo observa y d
   await page.getByRole('button', { name: 'Aprobar' }).click();
   await expect(page.getByText('Aprobado').first()).toBeVisible();
 
-  // el historial conserva las dos decisiones y la firma
+  // el historial conserva las dos decisiones, la firma y la foto
   await expect(page.getByText('Detallá cómo se destrabó la ventilación')).toBeVisible();
   await expect(page.getByText('Firma manuscrita')).toBeVisible();
+  // la foto del hecho y el trazo de la firma se ven en el registro cerrado
+  await expect(page.getByRole('img', { name: 'Adjunto' })).toHaveCount(2);
 });
 
 // Contra el proceso de producción (un solo servicio sirviendo API y app): es
