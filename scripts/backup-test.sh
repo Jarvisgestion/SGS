@@ -8,6 +8,12 @@ ORIGEN="sgs_backup_origen_$$"
 DESTINO="sgs_backup_destino_$$"
 TRABAJO="$(mktemp -d)"
 
+# Esta prueba crea bases descartables y les aplica el seed de demostración.
+# DATABASE_URL se descarta a propósito: si apuntara a una base real, correr
+# esto le cargaría el catálogo de Chiarmar encima. Las bases se eligen por
+# PGDATABASE en cada llamada.
+unset DATABASE_URL
+
 limpiar() {
   dropdb --if-exists --force "$ORIGEN" >/dev/null 2>&1 || true
   dropdb --if-exists --force "$DESTINO" >/dev/null 2>&1 || true
@@ -31,7 +37,7 @@ registros_origen="$(psql -tAd "$ORIGEN" -c 'SELECT count(*) FROM record_types')"
 riesgos_origen="$(psql -tAd "$ORIGEN" -c 'SELECT count(*) FROM risk_assessments')"
 
 echo "2. Resguardo"
-DATABASE_URL="postgres:///$ORIGEN" SGS_STORAGE_DIR="$TRABAJO/adjuntos" \
+PGDATABASE="$ORIGEN" SGS_STORAGE_DIR="$TRABAJO/adjuntos" \
   "$ROOT/scripts/backup.sh" "$TRABAJO/backups" >/dev/null
 CARPETA="$(find "$TRABAJO/backups" -mindepth 1 -maxdepth 1 -type d | head -1)"
 

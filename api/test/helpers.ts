@@ -7,7 +7,7 @@ import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.ts';
 import { hashSecret } from '../src/auth.ts';
-import { createPool, type Db } from '../src/db.ts';
+import { createPool, urlDeBase, type Db } from '../src/db.ts';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -37,12 +37,12 @@ export async function setupApi(opciones?: {
     stdio: 'pipe',
   });
 
-  const db = createPool(`postgres:///${dbName}`);
+  const db = createPool(urlDeBase(dbName));
   const app = await buildApp({
     config: {
       port: 0,
       host: '127.0.0.1',
-      databaseUrl: `postgres:///${dbName}`,
+      databaseUrl: urlDeBase(dbName),
       sessionSecret: SESSION_SECRET,
       sessionTtlSeconds: 3600,
       clientDir: null, // en los tests sólo importa la API

@@ -167,7 +167,13 @@ test.describe('sin señal', () => {
 
 test('en una tablet compartida, cada persona ve sólo sus borradores', async ({ page, context }) => {
   await entrar(page, CREDENCIALES.capitan);
+  // Se espera a que la app termine de bajar el catálogo: abrir un formulario
+  // sin señal depende de eso, y sin la espera el corte llega con la descarga
+  // todavía en vuelo.
+  await expect(page.getByRole('link', { name: /RE-01A-INC/ })).toBeVisible();
+  await page.waitForLoadState('networkidle');
   await page.getByRole('link', { name: /RE-01A-INC/ }).click();
+  await expect(page.getByLabel(/Tema tratado/)).toBeVisible();
 
   // sin señal para que el borrador quede pendiente de subir
   await context.setOffline(true);

@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { urlDeBase } from '../api/src/db.ts';
 import { hashSecret } from '../api/src/auth.ts';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -23,7 +24,7 @@ execFileSync(path.join(raiz, 'scripts/db-apply.sh'), ['--with-seed'], {
   stdio: 'pipe',
 });
 
-const db = new pg.Pool({ connectionString: `postgres:///${DB}` });
+const db = new pg.Pool({ connectionString: urlDeBase(DB) });
 
 async function crear(nombre: string, cred: { email: string; password: string; pin: string }, rol: string, buque: string | null) {
   const { rows } = await db.query<{ id: string }>(

@@ -12,6 +12,8 @@ trap cleanup EXIT
 dropdb --if-exists "$DB"
 createdb "$DB"
 export PGDATABASE="$DB"
+# Se descarta a propósito: si apuntara a una base real, esta prueba le aplicaría
+# el seed de demostración encima.
 unset DATABASE_URL
 
 "$ROOT/scripts/db-apply.sh" --with-seed

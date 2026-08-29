@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# Un push nuevo cancela la corrida anterior de la misma rama: no tiene sentido
+# esperar el resultado de un commit que ya quedó atrás.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PGHOST: localhost
+  PGUSER: sgs
+  PGPASSWORD: sgs
+  PGDATABASE: postgres
+
+jobs:
+  verificacion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      # La misma versión que usamos en desarrollo: el esquema depende de
+      # funciones de PostgreSQL 15+ (ON DELETE SET NULL por columna).
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sgs
+          POSTGRES_PASSWORD: sgs
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U sgs"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            client/package-lock.json
+            e2e/package-lock.json
+
+      # createdb/dropdb/pg_dump: los scripts de esquema y de resguardo los usan.
+      - name: Cliente de PostgreSQL
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client-16
+
+      - name: Dependencias
+        run: |
+          npm ci --prefix api
+          npm ci --prefix client
+          npm ci --prefix e2e
+
+      - name: Tipos
+        run: |
+          npm run typecheck --prefix api
+          npm run typecheck --prefix client
+
+      - name: Esquema de la base
+        run: ./scripts/db-test.sh
+
+      - name: API
+        run: npm test --prefix api
+
+      - name: Cliente
+        run: npm test --prefix client
+
+      - name: Resguardo y restauración
+        run: ./scripts/backup-test.sh
+
+      - name: Navegador para las pruebas de punta a punta
+        run: npx --prefix e2e playwright install --with-deps chromium
+
+      - name: Circuito completo en el navegador
+        run: npm test --prefix e2e
+
+      # Ante una falla, el rastro de Playwright es lo que permite ver qué pasó
+      # sin tener que reproducirlo a mano.
+      - name: Rastro de las pruebas que fallaron
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright
+          path: |
+            e2e/test-results/
+            e2e/playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore

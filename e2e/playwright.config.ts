@@ -1,4 +1,5 @@
 import { defineConfig } from '@playwright/test';
+import { urlDeBase } from '../api/src/db.ts';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -36,7 +37,7 @@ export default defineConfig({
       timeout: 120_000,
       reuseExistingServer: false,
       env: {
-        DATABASE_URL: `postgres:///${DB}`,
+        DATABASE_URL: urlDeBase(DB),
         SGS_SESSION_SECRET: 'secreto-de-prueba-de-al-menos-32-caracteres',
         SGS_CLIENT_DIR: path.join(raiz, 'client', 'dist'),
         // Los tests entran y salen muchas veces con la misma cuenta; el freno

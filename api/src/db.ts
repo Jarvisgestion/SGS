@@ -17,6 +17,21 @@ export function createPool(connectionString?: string): Db {
 }
 
 /**
+ * URL de conexión a una base concreta.
+ *
+ * En desarrollo alcanza `postgres:///nombre` (socket local, usuario del
+ * sistema). En integración continua la base viene por TCP con usuario y clave,
+ * así que se parte de DATABASE_URL y sólo se le cambia el nombre.
+ */
+export function urlDeBase(nombre: string): string {
+  const base = process.env.DATABASE_URL;
+  if (!base) return `postgres:///${nombre}`;
+  const url = new URL(base);
+  url.pathname = `/${nombre}`;
+  return url.toString();
+}
+
+/**
  * Corre `fn` en una transacción declarando quién es el actor.
  *
  * El `SET LOCAL sgs.actor_user_id` es lo que permite que los triggers de
