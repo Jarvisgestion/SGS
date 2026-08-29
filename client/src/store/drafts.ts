@@ -28,6 +28,8 @@ export interface Draft {
   dirty: boolean;
   /** Bloques de firma ya firmados en tierra (la firma exige conexión). */
   signedKeys: string[];
+  /** Hecho que obligó a cargar este registro (RE-01D con heridos -> RO-07A). */
+  parentRecordInstanceId?: string | null;
   updatedAt: string;
   /** Último error de sincronización, para mostrarlo sin perder el borrador. */
   lastError?: string;

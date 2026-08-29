@@ -43,6 +43,9 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
    */
   const actual = useRef<Draft | null>(null);
   const descartado = useRef(false);
+  /** Para poder sincronizar al salir sin atar el efecto a cada render. */
+  const contexto = useRef(ctx);
+  contexto.current = ctx;
 
   // --- carga del tipo de registro y del borrador --------------------------
   useEffect(() => {
@@ -133,6 +136,10 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
       window.removeEventListener('pagehide', volcar);
       document.removeEventListener('visibilitychange', volcar);
       volcar();
+      // Al salir del formulario el borrador se sube, si hay señal. Antes sólo
+      // se sincronizaba al recuperar la conexión: en un equipo que nunca se
+      // queda sin señal, lo cargado no llegaba a tierra hasta enviarlo.
+      if (navigator.onLine) void contexto.current.sincronizar();
     };
   }, []);
 
@@ -312,8 +319,9 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
 
       {disparados.length > 0 && (
         <div className="aviso alerta">
-          Por lo que marcaste, este hecho también exige cargar: <strong>{disparados.join(', ')}</strong>. Podés
-          hacerlo después de enviar este registro.
+          Por lo que marcaste, este hecho también exige cargar:{' '}
+          <strong>{disparados.join(', ')}</strong>. Al enviarlo vas a poder cargarlo desde acá,
+          enlazado a este registro; hasta que no esté, figura como pendiente en tierra.
         </div>
       )}
 

@@ -52,6 +52,20 @@ export async function dashboardRoutes(app: FastifyInstance) {
     return { certificates: rows };
   });
 
+  /**
+   * Registros que un hecho ya enviado dejó pendientes: un incendio con heridos
+   * exige el acaecimiento médico, y hasta que no se cargue queda a la vista.
+   */
+  app.get('/pending-children', async (req) => {
+    const { rows } = await app.db.query(
+      `SELECT * FROM v_registros_hijos_pendientes
+        WHERE company_id = $1
+        ORDER BY occurred_at DESC`,
+      [req.companyId],
+    );
+    return { pending_children: rows };
+  });
+
   /** Desvíos: ítems en no_ok de cualquier checklist (Anexo de desvíos de PO-05). */
   app.get('/nonconformities', async (req) => {
     const { rows } = await app.db.query(

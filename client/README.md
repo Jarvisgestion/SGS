@@ -64,6 +64,12 @@ la solapa **Catálogo**, con lo que ese rol puede editar y nada más:
 
 ## Decisiones que conviene conocer
 
+- **El borrador se sube al salir del formulario**, no sólo al enviarlo: si no,
+  en un equipo que nunca pierde señal lo cargado no llegaba a tierra hasta el
+  envío, y quien revisa no veía que el trabajo estaba en curso.
+- **Un hecho puede obligar a cargar otro registro.** El formulario lo avisa
+  mientras se completa, el registro enviado lo muestra con un botón para
+  cargarlo enlazado, y tierra lo ve en el tablero hasta que exista.
 - **Los borradores son de cada persona, no del equipo.** IndexedDB es del
   dispositivo: en una tablet compartida a bordo, sin separarlos el borrador del
   capitán le aparecería al siguiente que entre, y al sincronizarlo tierra lo
@@ -87,10 +93,8 @@ la solapa **Catálogo**, con lo que ese rol puede editar y nada más:
 
 ## Pendientes
 
-1. **Crear el registro hijo** que dispara otro registro (hoy la app avisa cuál
-   corresponde cargar, pero no lo encadena solo).
-3. **Elegir buque cuando la persona tiene rol en varios** está resuelto con un
+1. **Duplicar una revisión del manual** para no arrancar de cero al crear la
+   siguiente.
+2. **Elegir buque cuando la persona tiene rol en varios** está resuelto con un
    desplegable; falta el caso del asesor externo que opera varias empresas
    (la API ya lo soporta con `X-Company-Id`).
-4. **Duplicar una revisión del manual** para no arrancar de cero al crear la
-   siguiente.

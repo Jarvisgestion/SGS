@@ -67,6 +67,7 @@ autenticación, para el chequeo del balanceador.
 | `GET` | `/dashboard/pending-reviews` | Bandeja de revisión |
 | `GET` | `/dashboard/certificates` | RMGS-05: vencimientos |
 | `GET` | `/dashboard/nonconformities` | Desvíos de checklist |
+| `GET` | `/dashboard/pending-children` | Registros que un hecho dejó pendientes |
 | `GET/POST` | `/admin/manual-versions` | Revisiones del MGS |
 | `POST` | `/admin/manual-versions/:id/publicar` | Poner una revisión en vigencia |
 | `GET/POST/PATCH` | `/admin/procedures` | Procedimientos del manual |

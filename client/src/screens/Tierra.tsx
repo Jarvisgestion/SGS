@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { mensajeDeError, type Contexto } from '../app.tsx';
-import { api, type CertificateRow, type ComplianceRow, type RecordSummary } from '../lib/api.ts';
+import {
+  api,
+  type CertificateRow,
+  type ComplianceRow,
+  type HijoPendiente,
+  type RecordSummary,
+} from '../lib/api.ts';
 
 const ETIQUETA_CUMPLIMIENTO: Record<string, string> = {
   al_dia: 'Al día',
@@ -67,14 +73,20 @@ export function Bandeja({ ctx }: { ctx: Contexto }) {
 export function Tablero() {
   const [filas, setFilas] = useState<ComplianceRow[] | null>(null);
   const [certificados, setCertificados] = useState<CertificateRow[] | null>(null);
+  const [hijosPendientes, setHijosPendientes] = useState<HijoPendiente[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
       try {
-        const [cumplimiento, certs] = await Promise.all([api.compliance(), api.certificates()]);
+        const [cumplimiento, certs, hijos] = await Promise.all([
+          api.compliance(),
+          api.certificates(),
+          api.hijosPendientes(),
+        ]);
         setFilas(cumplimiento.compliance);
         setCertificados(certs.certificates);
+        setHijosPendientes(hijos.pending_children);
       } catch (err) {
         setError(mensajeDeError(err));
       }
@@ -89,6 +101,30 @@ export function Tablero() {
 
   return (
     <>
+      {hijosPendientes.length > 0 && (
+        <section className="panel">
+          <h2>Registros que un hecho dejó pendientes</h2>
+          <ul className="lista">
+            {hijosPendientes.map((h) => (
+              <li key={`${h.record_instance_id}-${h.required_record_type_code}`}>
+                <a href={`#/registro/${h.record_instance_id}`}>
+                  <span className="titulo">
+                    Falta <span className="codigo">{h.required_record_type_code}</span>
+                    <br />
+                    <small style={{ color: 'var(--tenue)' }}>
+                      Por «{h.field_label}» en {h.record_type_code} ·{' '}
+                      {h.vessel_name ?? 'Compañía'} ·{' '}
+                      {new Date(h.occurred_at).toLocaleDateString('es-AR')}
+                    </small>
+                  </span>
+                  <span className="chip vencido">Falta</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="panel">
         <h2>Requiere atención</h2>
         {filas === null ? (

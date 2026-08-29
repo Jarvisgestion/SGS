@@ -139,7 +139,24 @@ export async function recordRoutes(app: FastifyInstance) {
                       ORDER BY r.reviewed_at)
                  FROM record_reviews r
                  LEFT JOIN users ru ON ru.id = r.reviewer_id
-                WHERE r.record_instance_id = ri.id) AS reviews
+                WHERE r.record_instance_id = ri.id) AS reviews,
+              -- La cadena de registros: de qué hecho salió éste, y qué salió de él.
+              (SELECT json_build_object('id', pa.id, 'code', pt.code, 'name', pt.name)
+                 FROM record_instances pa
+                 JOIN record_types pt ON pt.id = pa.record_type_id
+                WHERE pa.id = ri.parent_record_instance_id) AS parent,
+              (SELECT json_agg(json_build_object(
+                        'id', h.id, 'code', ht.code, 'name', ht.name, 'status', h.status)
+                      ORDER BY h.created_at)
+                 FROM record_instances h
+                 JOIN record_types ht ON ht.id = h.record_type_id
+                WHERE h.parent_record_instance_id = ri.id) AS children,
+              (SELECT json_agg(json_build_object(
+                        'field_label', pc.field_label,
+                        'code', pc.required_record_type_code,
+                        'record_type_id', pc.required_record_type_id))
+                 FROM v_registros_hijos_pendientes pc
+                WHERE pc.record_instance_id = ri.id) AS pending_children
          FROM record_instances ri
          JOIN record_types rt ON rt.id = ri.record_type_id
          JOIN record_type_versions rtv

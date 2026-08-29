@@ -52,6 +52,27 @@ export function Registro({ ctx, id }: { ctx: Contexto; id: string }) {
   }
 
   /**
+   * Carga el registro que este hecho exige, enlazado al hecho: así queda
+   * asentado de dónde salió, y el pendiente deja de figurar.
+   */
+  async function cargarHijo(recordTypeId: string, codigo: string, nombre: string) {
+    if (!registro) return;
+    const hijo = newDraft({
+      userId: ctx.session.user.id,
+      companyId: ctx.session.user.companies[0]!,
+      recordTypeId,
+      recordTypeCode: codigo,
+      recordTypeName: nombre,
+      vesselId: registro.vessel_id,
+      data: {},
+    });
+    const enlazado = { ...hijo, parentRecordInstanceId: registro.id, marea: registro.marea };
+    await drafts.save(enlazado);
+    await ctx.recargarBorradores();
+    ir(`borrador/${enlazado.localId}`);
+  }
+
+  /**
    * Un registro observado vuelve a bordo como borrador, con los datos cargados.
    *
    * Las firmas que ya tiene se dan por hechas: cada bloque admite una sola
@@ -112,6 +133,60 @@ export function Registro({ ctx, id }: { ctx: Contexto; id: string }) {
           </div>
         )}
       </section>
+
+      {(registro.pending_children ?? []).length > 0 && (
+        <div className="aviso alerta">
+          <strong>Por lo que se marcó, este hecho exige cargar además:</strong>
+          <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+            {(registro.pending_children ?? []).map((h) => (
+              <li key={h.code} style={{ marginBottom: 8 }}>
+                <strong>{h.code}</strong> — {h.field_label}
+                {h.record_type_id ? (
+                  <button
+                    type="button"
+                    className="boton secundario"
+                    style={{ display: 'block', marginTop: 6 }}
+                    onClick={() => void cargarHijo(h.record_type_id, h.code, h.code)}
+                  >
+                    Cargar {h.code}
+                  </button>
+                ) : (
+                  <p style={{ margin: '4px 0 0' }}>
+                    Ese registro no está en la revisión vigente del manual.
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {(registro.parent || (registro.children ?? []).length > 0) && (
+        <section className="panel">
+          <h2>Registros relacionados</h2>
+          {registro.parent && (
+            <div className="dato">
+              <span className="k">Salió de</span>
+              <span className="v">
+                <a href={`#/registro/${registro.parent.id}`}>
+                  <span className="codigo">{registro.parent.code}</span> · {registro.parent.name}
+                </a>
+              </span>
+            </div>
+          )}
+          {(registro.children ?? []).map((h) => (
+            <div className="dato" key={h.id}>
+              <span className="k">Generó</span>
+              <span className="v">
+                <a href={`#/registro/${h.id}`}>
+                  <span className="codigo">{h.code}</span> · {h.name}
+                </a>{' '}
+                <span className={`chip ${h.status}`}>{ETIQUETA_ESTADO[h.status]}</span>
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
 
       {registro.status === 'observado' && ultimaObservacion && (
         <div className="aviso alerta">

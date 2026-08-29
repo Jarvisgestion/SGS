@@ -432,6 +432,51 @@ BEGIN
     'certificado vigente');
 END $$;
 
+\echo '  - registros que obligan a cargar otro'
+DO $$
+DECLARE
+  cid uuid := '11111111-1111-1111-1111-111111111111';
+  vid uuid := '22222222-2222-2222-2222-222222222222';
+  cap uuid; rt uuid; ver integer; rt_hijo uuid; padre uuid;
+BEGIN
+  SELECT id INTO cap FROM users WHERE full_name = 'Capitán Entrante';
+  SELECT id, version INTO rt, ver FROM record_types WHERE code = 'RE-01D';
+  SELECT id INTO rt_hijo FROM record_types WHERE code = 'RO-07A';
+
+  -- un incendio con heridos, ya enviado
+  INSERT INTO record_instances (company_id, record_type_id, record_type_version, vessel_id,
+                                created_by, status, data)
+  VALUES (cid, rt, ver, vid, cap, 'pendiente_revision',
+          '{"descripcion":"Incendio con heridos","hubo_heridos":true,"necesita_remolque":false}'::jsonb)
+  RETURNING id INTO padre;
+
+  PERFORM pg_temp.assert(
+    (SELECT count(*) FROM v_registros_hijos_pendientes WHERE record_instance_id = padre) = 1,
+    'el incendio con heridos exige cargar el acaecimiento médico');
+  PERFORM pg_temp.assert(
+    (SELECT required_record_type_code FROM v_registros_hijos_pendientes
+      WHERE record_instance_id = padre) = 'RO-07A',
+    'y dice cuál');
+
+  -- al cargar el hijo enlazado, deja de estar pendiente
+  INSERT INTO record_instances (company_id, record_type_id, record_type_version, vessel_id,
+                                created_by, parent_record_instance_id, data)
+  SELECT cid, rt_hijo, version, vid, cap, padre, '{}'::jsonb
+    FROM record_types WHERE id = rt_hijo;
+
+  PERFORM pg_temp.assert(
+    (SELECT count(*) FROM v_registros_hijos_pendientes WHERE record_instance_id = padre) = 0,
+    'con el hijo cargado ya no figura pendiente');
+
+  -- un borrador todavía no obliga a nada
+  INSERT INTO record_instances (company_id, record_type_id, record_type_version, vessel_id,
+                                created_by, data)
+  VALUES (cid, rt, ver, vid, cap, '{"hubo_heridos":true}'::jsonb);
+  PERFORM pg_temp.assert(
+    (SELECT count(*) FROM v_registros_hijos_pendientes WHERE company_id = cid) = 0,
+    'un borrador no genera la obligación');
+END $$;
+
 \echo '  - matriz de riesgo'
 DO $$
 DECLARE cid uuid := '11111111-1111-1111-1111-111111111111'; ra uuid;

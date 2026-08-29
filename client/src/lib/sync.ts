@@ -20,6 +20,7 @@ export interface SyncDeps {
     occurred_at?: string;
     marea?: string | null;
     data: FormData;
+    parent_record_instance_id?: string | null;
   }): Promise<{ id: string }>;
   updateRecord(
     id: string,
@@ -66,6 +67,7 @@ export async function syncDraft(draft: Draft, deps: SyncDeps): Promise<SyncOutco
         occurred_at: draft.occurredAt,
         marea: draft.marea,
         data: sinArchivosLocales(draft.data),
+        parent_record_instance_id: draft.parentRecordInstanceId ?? null,
       });
       serverId = created.id;
     } else {

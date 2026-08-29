@@ -253,6 +253,11 @@ export interface RecordDetail {
   reviews:
     | { id: string; decision: string; comment: string | null; reviewed_at: string; reviewer: string | null }[]
     | null;
+  /** El hecho del que salió este registro, si salió de otro. */
+  parent: { id: string; code: string; name: string } | null;
+  children: { id: string; code: string; name: string; status: RecordStatus }[] | null;
+  /** Registros que este hecho exige y todavía no se cargaron. */
+  pending_children: { field_label: string; code: string; record_type_id: string }[] | null;
 }
 
 export const api = {
@@ -342,6 +347,9 @@ export const api = {
       '/dashboard/pending-reviews',
     ),
 
+  hijosPendientes: () =>
+    request<{ pending_children: HijoPendiente[] }>('GET', '/dashboard/pending-children'),
+
   compliance: (onlyPending = false) =>
     request<{ compliance: ComplianceRow[] }>(
       'GET',
@@ -425,6 +433,18 @@ export interface ComplianceRow {
   last_approved_at: string | null;
   pending_count: number;
   compliance_status: 'al_dia' | 'por_vencer' | 'vencido' | 'sin_registro' | 'no_aplica';
+}
+
+export interface HijoPendiente {
+  record_instance_id: string;
+  vessel_name: string | null;
+  record_type_code: string;
+  record_type_name: string;
+  occurred_at: string;
+  field_label: string;
+  required_record_type_code: string;
+  required_record_type_id: string | null;
+  required_record_type_name: string | null;
 }
 
 export interface CertificateRow {

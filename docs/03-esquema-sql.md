@@ -96,6 +96,7 @@ tiene que estar completo y bien tipado.
 | `v_pending_reviews` | Bandeja de revisión, con cuánto hace que espera cada registro. |
 | `v_record_instance_signatures` | Qué bloques de firma declara el formulario y cuáles están efectivamente firmados. |
 | `v_record_nonconformities` | Ítems `no_ok` de cualquier checklist. |
+| `v_registros_hijos_pendientes` | Hechos ya enviados que, por lo marcado en el formulario (`triggers_record_type`), exigen otro registro que todavía no se cargó. Un borrador no cuenta: la obligación nace al enviarlo. |
 
 ## 6. Pendientes que este esquema deja explícitos
 
