@@ -52,9 +52,11 @@ la solapa **Catálogo**, con lo que ese rol puede editar y nada más:
 - **Matriz de riesgo** — los cuadros de PO-08, con su valoración y sus medidas
   de control. Es lo que citan los acaecimientos y los siniestros. La mantiene el
   Responsable de Seguridad e Higiene, que entra sólo a esta solapa.
-- **Manual** — revisiones del MGS y sus procedimientos. Poner una revisión en
-  vigencia deja la anterior superada, y sus formularios dejan de ofrecerse a
-  bordo; los registros ya cargados se siguen leyendo con el suyo.
+- **Manual** — revisiones del MGS y sus procedimientos. La siguiente se arma
+  copiando la anterior (lo derogado no se arrastra) y nace en borrador, así se
+  edita sin afectar lo que rige. Al ponerla en vigencia la anterior queda
+  superada y sus formularios dejan de ofrecerse a bordo; los registros ya
+  cargados se siguen leyendo con el suyo.
 - **Formularios** — el editor de campos: se agregan, se ordenan y se configuran
   los quince tipos de campo del esquema, con **vista previa** de cómo lo va a
   ver la tripulación. Guardar sube la versión del formulario y congela la
@@ -93,8 +95,6 @@ la solapa **Catálogo**, con lo que ese rol puede editar y nada más:
 
 ## Pendientes
 
-1. **Duplicar una revisión del manual** para no arrancar de cero al crear la
-   siguiente.
-2. **Elegir buque cuando la persona tiene rol en varios** está resuelto con un
+1. **Elegir buque cuando la persona tiene rol en varios** está resuelto con un
    desplegable; falta el caso del asesor externo que opera varias empresas
    (la API ya lo soporta con `X-Company-Id`).

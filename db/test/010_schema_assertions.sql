@@ -402,6 +402,12 @@ BEGIN
       WHERE record_type_code = 'RE-01A-INC' AND vessel_id = vid) = 'sin_registro',
     'un recurrente sin instancias figura como sin_registro');
 
+  -- una revisión superada no duplica las obligaciones del tablero
+  PERFORM pg_temp.assert(
+    (SELECT count(*) FROM v_record_compliance
+      WHERE record_type_code = 'RE-01A-INC' AND vessel_id = vid) = 1,
+    'cada obligación aparece una sola vez');
+
   -- los de evento no vencen
   PERFORM pg_temp.assert(
     (SELECT compliance_status FROM v_record_compliance

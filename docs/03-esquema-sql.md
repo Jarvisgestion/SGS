@@ -91,7 +91,7 @@ tiene que estar completo y bien tipado.
 
 | Vista | Para qué |
 |---|---|
-| `v_record_compliance` | RA-06C: por cada tipo de registro recurrente y buque, última instancia aprobada, próximo vencimiento y estado (`al_dia` / `por_vencer` / `vencido` / `sin_registro` / `no_aplica`). Es el tablero de la Persona Designada. |
+| `v_record_compliance` | RA-06C, medido contra la **revisión vigente** del manual: por cada tipo de registro recurrente y buque, última instancia aprobada, próximo vencimiento y estado (`al_dia` / `por_vencer` / `vencido` / `sin_registro` / `no_aplica`). Es el tablero de la Persona Designada. |
 | `v_vessel_certificate_status` | RMGS-05: vencimientos de certificados con días restantes. |
 | `v_pending_reviews` | Bandeja de revisión, con cuánto hace que espera cada registro. |
 | `v_record_instance_signatures` | Qué bloques de firma declara el formulario y cuáles están efectivamente firmados. |

@@ -113,9 +113,10 @@ describe('el ciclo del manual', () => {
   });
 
   it('los formularios de la revisión superada dejan de ofrecerse a bordo', async () => {
+    // ?todas_las_revisiones=false tiene que significar false, no "hay texto"
     const catalogo = await ctx.app.inject({
       method: 'GET',
-      url: '/api/catalog/record-types',
+      url: '/api/catalog/record-types?todas_las_revisiones=false&include_derogados=false',
       headers: auth(capitanToken),
     });
     assert.equal(catalogo.json().record_types.length, 0, 'Rev. 04 quedó superada');

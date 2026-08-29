@@ -1,13 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { HttpError } from '../errors.ts';
+import { booleanoDeQuery } from '../lib/query.ts';
 
 const listQuery = z.object({
   scope: z.enum(['company', 'vessel']).optional(),
   category: z.string().optional(),
-  include_derogados: z.coerce.boolean().default(false),
+  include_derogados: booleanoDeQuery(),
   /** Para la pantalla de administración: también los de revisiones superadas. */
-  todas_las_revisiones: z.coerce.boolean().default(false),
+  todas_las_revisiones: booleanoDeQuery(),
 });
 
 export async function catalogRoutes(app: FastifyInstance) {

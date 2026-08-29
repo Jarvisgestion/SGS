@@ -100,3 +100,36 @@ test('editar el formulario sube la versión y no toca lo ya cargado', async ({ p
   await expect(page.getByLabel('Puerto de entrega')).toHaveValue('Mar del Plata');
   await expect(page.getByLabel('N° de certificado de recepción')).toHaveCount(0);
 });
+
+test('la revisión siguiente se arma copiando la anterior', async ({ page }) => {
+  await entrar(page, CREDENCIALES.pd);
+  await page.getByRole('link', { name: 'Catálogo' }).click();
+  await page.getByRole('button', { name: 'Manual' }).click();
+
+  await page.getByLabel('Número de revisión').fill('Rev. 05');
+  await page.getByLabel('Partir de').selectOption({ label: 'Copiar Rev. 04' });
+  await page.getByRole('button', { name: 'Crear revisión' }).click();
+
+  await expect(page.locator('.aviso')).toContainText('formularios copiados');
+  await expect(page.locator('li').filter({ hasText: 'Rev. 05' })).toContainText('borrador');
+
+  // sigue en borrador: a bordo se ve todavía la Rev. 04
+  await page.getByRole('button', { name: 'Salir' }).click();
+  await entrar(page, CREDENCIALES.capitan);
+  await expect(page.getByRole('link', { name: /RE-01D/ })).toBeVisible();
+
+  // al ponerla en vigencia, el buque pasa a la nueva sin ver duplicados
+  await page.getByRole('button', { name: 'Salir' }).click();
+  await entrar(page, CREDENCIALES.pd);
+  await page.getByRole('link', { name: 'Catálogo' }).click();
+  await page.getByRole('button', { name: 'Manual' }).click();
+  await page
+    .locator('li')
+    .filter({ hasText: 'Rev. 05' })
+    .getByRole('button', { name: 'Poner en vigencia' })
+    .click();
+
+  await page.getByRole('button', { name: 'Salir' }).click();
+  await entrar(page, CREDENCIALES.capitan);
+  await expect(page.getByRole('link', { name: /RE-01D/ })).toHaveCount(1);
+});

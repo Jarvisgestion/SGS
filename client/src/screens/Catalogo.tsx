@@ -258,6 +258,8 @@ function Manual() {
   const [procedimientos, setProcedimientos] = useState<Procedure[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [nuevaRevision, setNuevaRevision] = useState('');
+  const [copiarDe, setCopiarDe] = useState('');
+  const [aviso, setAviso] = useState<string | null>(null);
   const [nuevoProc, setNuevoProc] = useState({ code: '', name: '' });
 
   async function recargar() {
@@ -279,8 +281,18 @@ function Manual() {
 
   async function crearRevision() {
     if (!nuevaRevision.trim()) return;
+    setError(null);
+    setAviso(null);
     try {
-      await admin.crearManual({ revision_number: nuevaRevision.trim() });
+      if (copiarDe) {
+        const nueva = await admin.duplicarManual(copiarDe, { revision_number: nuevaRevision.trim() });
+        setAviso(
+          `${nueva.revision_number} creada con ${nueva.formularios_copiados} formularios copiados. ` +
+            'Editala y recién después ponela en vigencia.',
+        );
+      } else {
+        await admin.crearManual({ revision_number: nuevaRevision.trim() });
+      }
       setNuevaRevision('');
       await recargar();
     } catch (err) {
@@ -344,16 +356,29 @@ function Manual() {
         )}
 
         <h3>Nueva revisión</h3>
+        {aviso && <div className="aviso info">{aviso}</div>}
         <div className="campo">
           <label htmlFor="rev">Número de revisión</label>
           <input id="rev" type="text" placeholder="Rev. 05" value={nuevaRevision} onChange={(e) => setNuevaRevision(e.target.value)} />
+        </div>
+        <div className="campo">
+          <label htmlFor="copiar">Partir de</label>
+          <select id="copiar" value={copiarDe} onChange={(e) => setCopiarDe(e.target.value)}>
+            <option value="">Manual en blanco</option>
+            {(revisiones ?? []).map((r) => (
+              <option key={r.id} value={r.id}>
+                Copiar {r.revision_number}
+              </option>
+            ))}
+          </select>
         </div>
         <button type="button" className="boton secundario" onClick={() => void crearRevision()}>
           Crear revisión
         </button>
         <p style={{ color: 'var(--tenue)', fontSize: 14 }}>
-          Nace en borrador. Al ponerla en vigencia, la anterior queda superada; los registros ya
-          cargados siguen leyéndose con el formulario que tenían.
+          Nace en borrador. Copiar trae los procedimientos y formularios vigentes de esa revisión
+          —lo derogado no se arrastra— como filas nuevas: editarlos no toca nada de lo ya cargado.
+          Al ponerla en vigencia, la anterior queda superada.
         </p>
       </section>
 

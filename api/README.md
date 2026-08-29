@@ -70,6 +70,7 @@ autenticación, para el chequeo del balanceador.
 | `GET` | `/dashboard/pending-children` | Registros que un hecho dejó pendientes |
 | `GET/POST` | `/admin/manual-versions` | Revisiones del MGS |
 | `POST` | `/admin/manual-versions/:id/publicar` | Poner una revisión en vigencia |
+| `POST` | `/admin/manual-versions/:id/duplicar` | Crear la siguiente copiando ésta |
 | `GET/POST/PATCH` | `/admin/procedures` | Procedimientos del manual |
 | `POST/PATCH` | `/admin/record-types` | Alta y edición de formularios |
 | `POST/PATCH` | `/admin/vessels` | Flota |
@@ -127,11 +128,8 @@ autenticación, para el chequeo del balanceador.
    (`src/storage.ts`). Alcanza para una instancia con un volumen persistente;
    para varias corriendo a la vez hace falta S3 o compatible, que es un archivo
    nuevo detrás de la misma interfaz.
-3. **Copiar una revisión del manual.** Al crear la Rev. 05 se arranca de cero:
-   falta poder duplicar los procedimientos y formularios de la revisión anterior
-   como punto de partida, que es como se trabaja en la práctica.
-4. **Paginado por cursor** en `/records` si el volumen lo pide; hoy es
+3. **Paginado por cursor** en `/records` si el volumen lo pide; hoy es
    `limit`/`offset`.
-5. **Política de bloqueo de cuenta.** Hoy hay un freno de intentos por minuto
+4. **Política de bloqueo de cuenta.** Hoy hay un freno de intentos por minuto
    por IP + cuenta; falta decidir, junto con el proveedor de identidad, si
    corresponde además bloquear la cuenta tras N fallos y cómo se desbloquea.

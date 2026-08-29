@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { booleanoDeQuery } from '../lib/query.ts';
 
 const complianceQuery = z.object({
   vessel_id: z.string().uuid().optional(),
   /** Por defecto muestra sólo lo que requiere atención. */
-  only_pending: z.coerce.boolean().default(false),
+  only_pending: booleanoDeQuery(),
 });
 
 export async function dashboardRoutes(app: FastifyInstance) {

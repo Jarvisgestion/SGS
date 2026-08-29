@@ -171,6 +171,64 @@ export async function adminRoutes(app: FastifyInstance) {
     });
   });
 
+  /**
+   * Crea la revisión siguiente copiando la anterior.
+   *
+   * Es como se trabaja en la práctica: la Rev. 05 no se escribe de cero, sale
+   * de la 04 y se le cambia lo que haga falta. Los formularios copiados son
+   * filas nuevas —arrancan en versión 1— así que editarlos no toca nada de lo
+   * ya cargado bajo la revisión anterior.
+   *
+   * Lo derogado no se arrastra: una revisión nueva parte de lo que rige hoy.
+   */
+  app.post('/manual-versions/:id/duplicar', async (req, reply) => {
+    const { id } = idParam.parse(req.params);
+    const body = manualBody.parse(req.body);
+
+    const row = await withTransaction(app.db, req.user.id, async (tx) => {
+      // El catálogo se copia entero de una: un formulario puede referenciar a
+      // otro que todavía no se insertó (RE-01D -> RO-07A).
+      await tx.query('SET CONSTRAINTS ALL DEFERRED');
+
+      const { rows: nuevas } = await tx.query<{ id: string }>(
+        `INSERT INTO manual_versions (company_id, revision_number, regulation, effective_date)
+         SELECT company_id, $2, COALESCE($3, regulation), $4
+           FROM manual_versions
+          WHERE id = $1 AND company_id = $5
+         RETURNING *`,
+        [id, body.revision_number, body.regulation ?? null, body.effective_date ?? null, req.companyId],
+      );
+      const nueva = nuevas[0];
+      if (!nueva) throw new HttpError(404, 'Revisión inexistente');
+
+      await tx.query(
+        `INSERT INTO procedures (manual_version_id, company_id, code, name, sort_order)
+         SELECT $2, company_id, code, name, sort_order
+           FROM procedures
+          WHERE manual_version_id = $1 AND status = 'vigente'`,
+        [id, nueva.id],
+      );
+
+      const { rowCount: formularios } = await tx.query(
+        `INSERT INTO record_types
+           (procedure_id, company_id, code, name, category, recurrence_type, recurrence_days,
+            scope, allowed_creator_roles, allowed_reviewer_roles, signature_requirement, field_schema)
+         SELECT nuevo.id, rt.company_id, rt.code, rt.name, rt.category, rt.recurrence_type,
+                rt.recurrence_days, rt.scope, rt.allowed_creator_roles, rt.allowed_reviewer_roles,
+                rt.signature_requirement, rt.field_schema
+           FROM record_types rt
+           JOIN procedures viejo ON viejo.id = rt.procedure_id AND viejo.manual_version_id = $1
+           JOIN procedures nuevo ON nuevo.manual_version_id = $2 AND nuevo.code = viejo.code
+          WHERE rt.status = 'vigente'`,
+        [id, nueva.id],
+      );
+
+      return { ...nueva, formularios_copiados: formularios };
+    });
+
+    return reply.code(201).send(row);
+  });
+
   // --- procedimientos -------------------------------------------------------
 
   app.get('/procedures', async (req) => {

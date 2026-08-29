@@ -376,6 +376,17 @@ export const admin = {
   publicarManual: (id: string) =>
     request<ManualVersion>('POST', `/admin/manual-versions/${id}/publicar`),
 
+  /** Crea la revisión siguiente copiando el catálogo vigente de otra. */
+  duplicarManual: (
+    id: string,
+    body: { revision_number: string; effective_date?: string },
+  ) =>
+    request<ManualVersion & { formularios_copiados: number }>(
+      'POST',
+      `/admin/manual-versions/${id}/duplicar`,
+      body,
+    ),
+
   procedures: (manualVersionId?: string) =>
     request<{ procedures: Procedure[] }>(
       'GET',
