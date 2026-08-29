@@ -26,6 +26,7 @@ export interface TestContext {
 /** Base descartable con migraciones y seed aplicados. */
 export async function setupApi(opciones?: {
   loginRateLimit?: number;
+  pinRateLimit?: number;
   maxUploadBytes?: number;
 }): Promise<TestContext> {
   const dbName = `sgs_api_test_${randomUUID().slice(0, 8)}`;
@@ -47,8 +48,10 @@ export async function setupApi(opciones?: {
       clientDir: null, // en los tests sólo importa la API
       trustProxy: false,
       loginRateLimit: opciones?.loginRateLimit ?? 1000,
+      pinRateLimit: opciones?.pinRateLimit ?? 1000,
       storageDir: almacenamiento,
       maxUploadBytes: opciones?.maxUploadBytes ?? 10 * 1024 * 1024,
+      logLevel: 'silent',
     },
     db,
   });

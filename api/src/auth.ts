@@ -12,6 +12,13 @@ const scrypt = promisify(scryptCb) as (
 const KEYLEN = 64;
 
 /**
+ * Hash de descarte para cuando no hay contra qué comparar (email inexistente,
+ * usuario sin PIN). Sin esto la verificación devolvía false al instante y el
+ * tiempo de respuesta delataba qué cuentas existen.
+ */
+const SAL_DE_DESCARTE = randomBytes(16);
+
+/**
  * Hash de contraseñas y PIN con scrypt de node:crypto — sin dependencias
  * nativas. Formato: `scrypt$<salt base64url>$<hash base64url>`.
  */
@@ -22,12 +29,18 @@ export async function hashSecret(secret: string): Promise<string> {
 }
 
 export async function verifySecret(secret: string, stored: string | null): Promise<boolean> {
-  if (!stored) return false;
-  const [scheme, saltB64, hashB64] = stored.split('$');
-  if (scheme !== 'scrypt' || !saltB64 || !hashB64) return false;
-  const expected = Buffer.from(hashB64, 'base64url');
+  const [scheme, saltB64, hashB64] = (stored ?? '').split('$');
+  const valido = scheme === 'scrypt' && !!saltB64 && !!hashB64;
+
+  // Se deriva igual aunque no haya nada que comparar: el trabajo de scrypt es
+  // lo que domina el tiempo de respuesta, y así no se distingue una cuenta
+  // inexistente de una con la contraseña equivocada.
+  const sal = valido ? Buffer.from(saltB64!, 'base64url') : SAL_DE_DESCARTE;
+  const actual = await scrypt(secret, sal, KEYLEN);
+  if (!valido) return false;
+
+  const expected = Buffer.from(hashB64!, 'base64url');
   if (expected.length !== KEYLEN) return false;
-  const actual = await scrypt(secret, Buffer.from(saltB64, 'base64url'), KEYLEN);
   return timingSafeEqual(expected, actual);
 }
 

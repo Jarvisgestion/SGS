@@ -104,16 +104,37 @@ docker compose exec app node --experimental-strip-types api/src/cli/credentials.
 Ese rol habilita la solapa **Catálogo**, desde donde se cargan el manual, los
 formularios, la flota y el resto del personal.
 
+## Resguardos
+
+`scripts/backup.sh` guarda la base y los adjuntos juntos —son las dos mitades
+del mismo registro— con un manifiesto para poder verificarlos sin restaurar.
+`scripts/restore.sh` los devuelve, comprobando antes que el dump coincida con su
+manifiesto y negándose a pisar una base que ya tenga tablas.
+
+```bash
+DATABASE_URL=... SGS_STORAGE_DIR=... ./scripts/backup.sh /destino/backups
+./scripts/restore.sh /destino/backups/<fecha> sgs_restaurada /destino/adjuntos
+```
+
+**`scripts/backup-test.sh` prueba el circuito entero**: carga datos, respalda,
+restaura en una base nueva y compara. Correlo cada tanto: un resguardo que nunca
+se restauró no es un resguardo. Fue esa prueba la que encontró que, sin la
+migración 0014, la restauración fallaba y dejaba tablas vacías.
+
+Si usás una base administrada con backups automáticos, siguen haciendo falta los
+adjuntos: el proveedor respalda la base, no el volumen.
+
 ## Antes de ponerlo en manos de un cliente
 
-1. **Backups de la base.** Es el registro que se muestra ante una inspección de
-   PNA: si se pierde, no hay sistema que valga. Verificá que los backups
-   automáticos estén encendidos y probá una restauración antes de cargar datos
-   reales.
-2. **Confirmar `signature_requirement` con PNA.** Qué evidencia de firma acepta
+1. **Probá una restauración completa** con `scripts/backup-test.sh` y, sobre el
+   entorno real, restaurando un resguardo en una base aparte. Es el registro que
+   se muestra ante una inspección de PNA: si no se puede recuperar, no hay
+   sistema que valga.
+2. **Leer `docs/04-seguridad.md`**, que lista lo corregido y las seis
+   decisiones que quedan abiertas (revocación de sesiones, separación de
+   funciones, política de contraseñas).
+3. **Confirmar `signature_requirement` con PNA.** Qué evidencia de firma acepta
    para cada tipo de registro sigue sin definirse; los valores actuales son un
    supuesto nuestro (`docs/03-esquema-sql.md` §6).
-3. **Backup del volumen de adjuntos**, junto con el de la base. Son parte del
-   mismo registro.
 4. **Retención.** Definir cuánto se conserva un registro aprobado y qué pasa al
    dar de baja una empresa.

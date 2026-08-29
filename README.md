@@ -15,6 +15,7 @@ empresa.
 | API HTTP | `api/` | Ciclo de registro y ABM del catálogo |
 | Cliente a bordo y de tierra | `client/` | Carga sin señal, firma, revisión, tablero y edición del manual |
 | Despliegue | `Dockerfile`, `DEPLOY.md` | Un solo contenedor: API y app en el mismo origen |
+| Resguardos y seguridad | `scripts/backup*.sh`, `docs/04-seguridad.md` | Restauración probada; repaso con lo corregido y lo abierto |
 | Prueba del circuito completo | `e2e/` | En navegador real, sobre la base real |
 | Catálogo real de Xeitosiño / Pesantar | — | Pendiente del relevamiento |
 
@@ -72,6 +73,7 @@ de ponerlo en manos de un cliente están en [`DEPLOY.md`](DEPLOY.md).
 cd api    && npm test         # ciclo del registro contra la base real
 cd client && npm test         # formularios dinámicos y sincronización
 cd e2e    && npm test         # circuito completo en un navegador real
+./scripts/backup-test.sh      # respalda, restaura y compara
 ```
 
 Las pruebas de punta a punta levantan el mismo proceso que se despliega —API y

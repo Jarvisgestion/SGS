@@ -26,6 +26,17 @@ db/
 
 ## Reglas
 
+- **Toda función nueva declara su `search_path`:**
+
+  ```sql
+  CREATE OR REPLACE FUNCTION sgs_algo() RETURNS ... AS $$ ... $$
+  SET search_path = public, pg_temp;
+  ```
+
+  Sin eso, una función que llama a otra sin calificar falla al restaurar un
+  resguardo: `pg_restore` vacía el `search_path` a propósito. La migración 0014
+  se lo puso a todas las que existían; las nuevas tienen que traerlo.
+
 - **Las migraciones no se editan una vez aplicadas.** `db-apply.sh` guarda el
   sha256 de cada archivo y aborta si cambia; para corregir algo se agrega una
   migración nueva.

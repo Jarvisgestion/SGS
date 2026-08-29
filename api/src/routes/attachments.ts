@@ -4,6 +4,15 @@ import { HttpError } from '../errors.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
+/**
+ * El nombre del archivo lo eligió quien subió: va a una cabecera HTTP, así que
+ * se reduce a un conjunto seguro en vez de sacarle unos pocos caracteres.
+ */
+function nombreSeguro(nombre: string | null): string {
+  const limpio = (nombre ?? '').replace(/[^A-Za-z0-9._ -]/g, '_').trim().slice(0, 100);
+  return limpio || 'adjunto';
+}
+
 export async function attachmentRoutes(app: FastifyInstance) {
   /**
    * Descarga de un adjunto. Va por la API y no por una URL pública del
@@ -32,10 +41,7 @@ export async function attachmentRoutes(app: FastifyInstance) {
     }
 
     reply.header('content-type', adjunto.content_type ?? 'application/octet-stream');
-    reply.header(
-      'content-disposition',
-      `inline; filename="${(adjunto.file_name ?? 'adjunto').replace(/["\\]/g, '')}"`,
-    );
+    reply.header('content-disposition', `inline; filename="${nombreSeguro(adjunto.file_name)}"`);
     // El contenido es inmutable: la clave es el hash de lo que hay adentro.
     reply.header('cache-control', 'private, max-age=31536000, immutable');
     return reply.send(await app.almacenamiento.abrir(adjunto.storage_key));

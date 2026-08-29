@@ -34,8 +34,8 @@ export async function authRoutes(app: FastifyInstance) {
       [email, 'activo'],
     );
 
-    // Se verifica igual cuando el usuario no existe, para no filtrar por tiempo
-    // de respuesta qué emails están dados de alta.
+    // verifySecret deriva la clave aunque no haya usuario, para que el tiempo
+    // de respuesta no delate qué emails están dados de alta.
     const ok = await verifySecret(password, rows[0]?.password_hash ?? null);
     if (!ok || !rows[0]) throw new HttpError(401, 'Email o contraseña incorrectos');
 

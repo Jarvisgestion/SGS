@@ -42,13 +42,34 @@ export async function buildApp({
   logger = false,
   almacenamiento,
 }: AppOptions): Promise<FastifyInstance> {
-  const app = Fastify({ logger, bodyLimit: 2 * 1024 * 1024, trustProxy: config.trustProxy });
+  const app = Fastify({
+    logger: logger ? opcionesDeRegistro(config) : false,
+    bodyLimit: 2 * 1024 * 1024,
+    trustProxy: config.trustProxy,
+  });
 
   app.decorate('db', db ?? createPool(config.databaseUrl));
   app.decorate('config', config);
   app.decorate('almacenamiento', almacenamiento ?? new AlmacenamientoEnDisco(config.storageDir));
   app.decorateRequest('user', null as unknown as CurrentUser);
   app.decorateRequest('companyId', '');
+
+  /**
+   * Quién hizo cada pedido, en el registro de acceso. Sin esto, ante una
+   * consulta —o una inspección— el log dice qué pasó pero no de quién salió.
+   */
+  app.addHook('onResponse', async (req, reply) => {
+    if (req.url === '/health' || !req.user) return;
+    req.log.info(
+      {
+        usuario: req.user.id,
+        empresa: req.companyId,
+        estado: reply.statusCode,
+        ms: Math.round(reply.elapsedTime),
+      },
+      'pedido atendido',
+    );
+  });
 
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof ZodError) {
@@ -169,4 +190,35 @@ function resolveCompany(user: CurrentUser, header: string | string[] | undefined
   if (user.companies.length === 1) return user.companies[0]!;
   if (user.companies.length === 0) throw new HttpError(403, 'El usuario no tiene empresa asignada');
   throw new HttpError(400, 'Indicá la empresa con la cabecera X-Company-Id');
+}
+
+/**
+ * Configuración del registro de actividad.
+ *
+ * Lo que se anota tiene que servir para reconstruir qué pasó sin guardar lo que
+ * no corresponde: nunca la contraseña, el PIN ni el token de sesión.
+ */
+function opcionesDeRegistro(config: Config) {
+  return {
+    level: config.logLevel,
+    redact: {
+      paths: [
+        'req.headers.authorization',
+        'req.headers.cookie',
+        'req.body.password',
+        'req.body.pin',
+        'password',
+        'pin',
+      ],
+      censor: '[oculto]',
+    },
+    serializers: {
+      // La URL sin query: los identificadores van en la ruta y alcanzan.
+      req: (req: { method: string; url: string; ip: string }) => ({
+        metodo: req.method,
+        url: req.url.split('?')[0],
+        ip: req.ip,
+      }),
+    },
+  };
 }

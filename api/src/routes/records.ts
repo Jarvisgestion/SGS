@@ -237,8 +237,22 @@ export async function recordRoutes(app: FastifyInstance) {
     });
   });
 
-  /** Firma de un bloque del formulario. */
-  app.post('/:id/signatures', async (req, reply) => {
+  /**
+   * Firma de un bloque del formulario.
+   *
+   * Con límite de intentos: el PIN es de 4 a 8 dígitos, así que quien tuviera
+   * una sesión ajena podría probarlos todos hasta firmar en nombre de otro. Va
+   * por usuario y no por IP: a bordo todos salen por la misma.
+   */
+  app.post('/:id/signatures', {
+    config: {
+      rateLimit: {
+        max: app.config.pinRateLimit,
+        timeWindow: '1 minute',
+        keyGenerator: (req: { user?: { id?: string }; ip: string }) => req.user?.id ?? req.ip,
+      },
+    },
+  }, async (req, reply) => {
     const { id } = idParam.parse(req.params);
     const body = signatureBody.parse(req.body);
 
