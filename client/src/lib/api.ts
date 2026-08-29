@@ -408,6 +408,17 @@ export const admin = {
 
   crearBuque: (body: Record<string, unknown>) => request<Vessel>('POST', '/admin/vessels', body),
 
+  /** El catálogo de una revisión, como archivo: revisable y versionable. */
+  exportarManual: (id: string) =>
+    request<Record<string, unknown>>('GET', `/admin/manual-versions/${id}/exportar`),
+
+  importarManual: (catalogo: unknown, revision_number?: string) =>
+    request<{ revision_number: string; procedimientos: number; formularios: number }>(
+      'POST',
+      '/admin/manual-versions/importar',
+      { catalogo, ...(revision_number ? { revision_number } : {}) },
+    ),
+
   crearRiesgo: (body: Record<string, unknown>) => request<Riesgo>('POST', '/admin/risks', body),
 
   editarRiesgo: (id: string, body: Record<string, unknown>) =>

@@ -415,7 +415,10 @@ sin necesidad de un modo offline complejo.
    desde cero definiendo su propio catálogo en la plataforma, o si se les
    pre-carga una copia del catálogo de Chiarmar como punto de partida para editar
    (más rápido, pero hay que dejar claro que es un punto de partida, no el
-   contenido final).
+   contenido final). — **La decisión ya no es costosa:** el catálogo se exporta
+   e importa como archivo (`api/README.md`), así que arrancar de cero o partir de
+   una copia son dos comandos, y el manual de una empresa se puede preparar como
+   documento antes de cargarlo.
 3. **Definir `signature_requirement` por tipo de registro** una vez haya
    confirmación de PNA sobre qué evidencia electrónica aceptan — el modelo ya
    soporta la configuración por `record_type`, falta el criterio de negocio.

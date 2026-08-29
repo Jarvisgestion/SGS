@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { CREDENCIALES } from './credenciales.ts';
 
@@ -132,4 +133,31 @@ test('la revisión siguiente se arma copiando la anterior', async ({ page }) => 
   await page.getByRole('button', { name: 'Salir' }).click();
   await entrar(page, CREDENCIALES.capitan);
   await expect(page.getByRole('link', { name: /RE-01D/ })).toHaveCount(1);
+});
+
+test('el catálogo se baja como archivo y se vuelve a cargar', async ({ page }) => {
+  await entrar(page, CREDENCIALES.pd);
+  await page.getByRole('link', { name: 'Catálogo' }).click();
+  await page.getByRole('button', { name: 'Manual' }).click();
+
+  // se baja el catálogo vigente
+  const descarga = page.waitForEvent('download');
+  await page
+    .locator('li')
+    .filter({ hasText: 'vigente' })
+    .getByRole('button', { name: 'Exportar' })
+    .click();
+  const archivo = await descarga;
+  const ruta = await archivo.path();
+
+  const catalogo = JSON.parse(readFileSync(ruta, 'utf8'));
+  expect(catalogo.formato).toBe('sgs.catalogo/1');
+  expect(catalogo.procedures.length).toBeGreaterThan(0);
+
+  // y se vuelve a cargar como una revisión nueva
+  await page.getByLabel('Número de revisión').fill('Rev. 10');
+  await page.getByLabel('Catálogo exportado (.json)').setInputFiles(ruta);
+
+  await expect(page.locator('.aviso')).toContainText('formularios');
+  await expect(page.locator('li').filter({ hasText: 'Rev. 10' })).toContainText('borrador');
 });

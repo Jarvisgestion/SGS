@@ -13,6 +13,7 @@
     "start": "node --experimental-strip-types src/server.ts",
     "credentials": "node --experimental-strip-types src/cli/credentials.ts",
     "migrate": "node --experimental-strip-types src/cli/migrate.ts",
+    "catalogo": "node --experimental-strip-types src/cli/catalogo.ts",
     "test": "node --experimental-strip-types --test test/*.test.ts"
   },
   "dependencies": {

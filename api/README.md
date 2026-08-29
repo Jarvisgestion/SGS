@@ -16,6 +16,28 @@ PGDATABASE=sgs_dev ../scripts/db-apply.sh --with-seed
 npm start                     # o npm run dev
 ```
 
+## El catálogo como archivo
+
+Cargar el manual de una empresa formulario por formulario en la pantalla es
+viable para retocar, no para arrancar. El catálogo se puede sacar y traer como
+un archivo JSON —revisable, versionable, comparable entre revisiones— con el
+mismo formato que usa la base:
+
+```bash
+# sacar el catálogo vigente de una empresa
+npm run catalogo -- --exportar --empresa "Pesquera Chiarmar" > chiarmar.json
+
+# cargarlo en otra, como revisión nueva en borrador
+npm run catalogo -- --importar chiarmar.json --empresa "Xeitosiño S.A." --revision "Rev. 01"
+```
+
+Importar no cambia lo que rige: la revisión entra en borrador y hay que ponerla
+en vigencia desde la aplicación. La validación de fondo la hace la base, así que
+un archivo mal armado se rechaza diciendo qué campo o qué rol está mal.
+
+Lo mismo está en la pantalla (solapa **Catálogo → Manual**), con un botón para
+bajar el archivo y otro para cargarlo.
+
 ## Usuarios
 
 El seed carga el catálogo, no las personas. El alta se hace con:
@@ -71,6 +93,8 @@ autenticación, para el chequeo del balanceador.
 | `GET/POST` | `/admin/manual-versions` | Revisiones del MGS |
 | `POST` | `/admin/manual-versions/:id/publicar` | Poner una revisión en vigencia |
 | `POST` | `/admin/manual-versions/:id/duplicar` | Crear la siguiente copiando ésta |
+| `GET` | `/admin/manual-versions/:id/exportar` | Bajar el catálogo como archivo |
+| `POST` | `/admin/manual-versions/importar` | Cargar un catálogo desde un archivo |
 | `GET/POST/PATCH` | `/admin/procedures` | Procedimientos del manual |
 | `POST/PATCH` | `/admin/record-types` | Alta y edición de formularios |
 | `POST/PATCH` | `/admin/vessels` | Flota |

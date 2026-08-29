@@ -18,7 +18,9 @@ Qué cubre:
   el service worker: se abre un formulario nuevo fuera de cobertura, se
   completa, se reabre la app todavía sin señal y el borrador sigue ahí; al
   volver la conexión se sube solo.
-- **`catalogo.spec.ts`** — la tesis del proyecto: la Persona Designada crea un
+- **`catalogo.spec.ts`** — también: la revisión siguiente armada copiando la
+  anterior, y el catálogo bajado como archivo y vuelto a cargar. Y la tesis del
+  proyecto: la Persona Designada crea un
   procedimiento y un formulario nuevos desde la pantalla (con campo obligatorio,
   lista de opciones y bloque de firma), y el capitán lo carga y lo firma a
   bordo, sin que cambie una línea de código. Después verifica que editar el

@@ -300,6 +300,45 @@ function Manual() {
     }
   }
 
+  /** Baja el catálogo como archivo, para revisarlo o llevarlo a otra empresa. */
+  async function exportar(revision: ManualVersion) {
+    setError(null);
+    try {
+      const catalogo = await admin.exportarManual(revision.id);
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(catalogo, null, 2)], { type: 'application/json' }),
+      );
+      const enlace = document.createElement('a');
+      enlace.href = url;
+      enlace.download = `catalogo-${revision.revision_number.replace(/[^A-Za-z0-9._-]/g, '-')}.json`;
+      enlace.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(mensajeDeError(err));
+    }
+  }
+
+  /** Carga un catálogo preparado afuera. Entra como revisión en borrador. */
+  async function importar(archivo: File | undefined) {
+    if (!archivo) return;
+    setError(null);
+    setAviso(null);
+    try {
+      const catalogo = JSON.parse(await archivo.text());
+      const r = await admin.importarManual(catalogo, nuevaRevision.trim() || undefined);
+      setAviso(
+        `${r.revision_number} cargada: ${r.procedimientos} procedimientos y ${r.formularios} ` +
+          'formularios. Queda en borrador; revisala antes de ponerla en vigencia.',
+      );
+      setNuevaRevision('');
+      await recargar();
+    } catch (err) {
+      setError(
+        err instanceof SyntaxError ? 'El archivo no es un catálogo válido' : mensajeDeError(err),
+      );
+    }
+  }
+
   async function crearProcedimiento() {
     if (!vigente || !nuevoProc.code.trim()) return;
     try {
@@ -339,6 +378,14 @@ function Manual() {
                   <span className={`chip ${r.status === 'vigente' ? 'aprobado' : r.status === 'borrador' ? 'borrador' : 'no_aplica'}`}>
                     {r.status}
                   </span>
+                  <button
+                    type="button"
+                    className="boton secundario"
+                    style={{ minHeight: 38 }}
+                    onClick={() => void exportar(r)}
+                  >
+                    Exportar
+                  </button>
                   {r.status !== 'vigente' && (
                     <button
                       type="button"
@@ -375,6 +422,23 @@ function Manual() {
         <button type="button" className="boton secundario" onClick={() => void crearRevision()}>
           Crear revisión
         </button>
+
+        <h3>…o cargarla desde un archivo</h3>
+        <div className="campo">
+          <label htmlFor="archivo">Catálogo exportado (.json)</label>
+          <input
+            id="archivo"
+            type="file"
+            accept="application/json,.json"
+            onChange={(e) => void importar(e.target.files?.[0])}
+          />
+          <p style={{ color: 'var(--tenue)', fontSize: 14, margin: '6px 0 0' }}>
+            Sirve para preparar el manual afuera —como un documento que se revisa y se compara— y
+            traerlo cargado, en vez de tipear cada formulario. Si escribiste un número de revisión
+            arriba, se usa ése; si no, el que trae el archivo.
+          </p>
+        </div>
+
         <p style={{ color: 'var(--tenue)', fontSize: 14 }}>
           Nace en borrador. Copiar trae los procedimientos y formularios vigentes de esa revisión
           —lo derogado no se arrastra— como filas nuevas: editarlos no toca nada de lo ya cargado.

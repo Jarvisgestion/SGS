@@ -9,6 +9,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { hashSecret } from '../auth.ts';
+import { catalogoSchema, exportarCatalogo, importarCatalogo } from '../catalogo.ts';
 import { withTransaction } from '../db.ts';
 import { HttpError } from '../errors.ts';
 
@@ -227,6 +228,36 @@ export async function adminRoutes(app: FastifyInstance) {
     });
 
     return reply.code(201).send(row);
+  });
+
+  /** Descarga el catálogo vigente de una revisión como archivo. */
+  app.get('/manual-versions/:id/exportar', async (req, reply) => {
+    const { id } = idParam.parse(req.params);
+    const catalogo = await exportarCatalogo(app.db, id, req.companyId);
+    if (!catalogo) throw new HttpError(404, 'Revisión inexistente');
+
+    reply.header(
+      'content-disposition',
+      `attachment; filename="catalogo-${catalogo.revision_number.replace(/[^A-Za-z0-9._-]/g, '-')}.json"`,
+    );
+    return catalogo;
+  });
+
+  /**
+   * Carga un catálogo desde un archivo, como revisión nueva en borrador.
+   *
+   * Sirve para preparar el manual de una empresa afuera y traerlo, y también
+   * para arrancar el de una empresa a partir del de otra.
+   */
+  app.post('/manual-versions/importar', async (req, reply) => {
+    const body = z
+      .object({ catalogo: catalogoSchema, revision_number: z.string().min(1).optional() })
+      .parse(req.body);
+
+    const resultado = await withTransaction(app.db, req.user.id, (tx) =>
+      importarCatalogo(tx, req.companyId, body.catalogo, body.revision_number),
+    );
+    return reply.code(201).send(resultado);
   });
 
   // --- procedimientos -------------------------------------------------------
