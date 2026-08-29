@@ -1,4 +1,5 @@
 import type { FormData } from '../lib/schema.ts';
+import { archivos } from './archivos.ts';
 import { DRAFTS, idb } from './idb.ts';
 
 /**
@@ -58,5 +59,9 @@ export const drafts = {
   all: async (userId: string) => (await idb.getAll<Draft>(DRAFTS)).filter((d) => d.userId === userId),
   get: (localId: string) => idb.get<Draft>(DRAFTS, localId),
   save: (draft: Draft) => idb.put(DRAFTS, { ...draft, updatedAt: new Date().toISOString() }),
-  remove: (localId: string) => idb.delete(DRAFTS, localId),
+  /** Borrar el borrador se lleva también sus archivos: no dejan de tener dueño. */
+  async remove(localId: string) {
+    await archivos.borrarDeBorrador(localId);
+    await idb.delete(DRAFTS, localId);
+  },
 };

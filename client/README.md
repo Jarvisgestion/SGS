@@ -28,9 +28,10 @@ registro nuevo o le cambia un campo, la app lo muestra sin tocar el cliente.
 
 **Se puede cargar sin señal.** Al entrar, la app baja el catálogo *y el
 formulario de cada tipo de registro* a IndexedDB. Con eso, fuera de cobertura se
-puede abrir un registro nuevo, completarlo y guardarlo; el borrador sobrevive a
-cerrar la app o apagar el equipo. Cuando vuelve la señal, los borradores se
-suben solos.
+puede abrir un registro nuevo, completarlo, **sacarle una foto** y guardarlo; el
+borrador y sus archivos sobreviven a cerrar la app o apagar el equipo. Cuando
+vuelve la señal se suben solos, y el archivo se suelta del dispositivo recién
+cuando está confirmado en tierra.
 
 **Firmar y enviar exigen conexión**, a propósito: la firma queda del lado del
 servidor con su evidencia, y el envío dispara la validación completa contra la
@@ -73,24 +74,22 @@ asesor externo) aparece la solapa **Catálogo**:
   un índice único), no el cliente.
 - **La firma se sube como archivo PNG**, igual que cualquier otro adjunto: no
   queda incrustada en el registro.
-- **Adjuntar una foto exige señal.** El resto del formulario se completa sin
-  cobertura, pero un archivo no se puede guardar en el borrador local y subir
-  después; la app lo dice en vez de aceptarlo y perderlo.
+- **Las fotos también se sacan sin señal.** El archivo queda en el dispositivo
+  referenciado como `local:<id>` y se sube junto con el borrador cuando hay
+  cobertura; recién ahí se suelta del equipo. Mientras tanto la foto se ve igual,
+  con el aviso de que todavía está pendiente.
 - **El service worker sólo cachea el armazón de la app.** Los datos viven en
   IndexedDB; `/api` nunca se cachea, para no mostrar un estado viejo como si
   fuera el actual.
 
 ## Pendientes
 
-1. **Adjuntar fotos sin señal**: hoy el campo de archivo pide conexión. Para
-   resolverlo hay que guardar el archivo en el dispositivo y subirlo con el
-   resto del borrador.
-2. **Campos `risk_reference` y `user_reference`**: hoy se editan como texto;
+1. **Campos `risk_reference` y `user_reference`**: hoy se editan como texto;
    falta el selector contra la matriz de riesgo y contra la tripulación.
-3. **Crear el registro hijo** que dispara otro registro (hoy la app avisa cuál
+2. **Crear el registro hijo** que dispara otro registro (hoy la app avisa cuál
    corresponde cargar, pero no lo encadena solo).
-4. **Elegir buque cuando la persona tiene rol en varios** está resuelto con un
+3. **Elegir buque cuando la persona tiene rol en varios** está resuelto con un
    desplegable; falta el caso del asesor externo que opera varias empresas
    (la API ya lo soporta con `X-Company-Id`).
-5. **Duplicar una revisión del manual** para no arrancar de cero al crear la
+4. **Duplicar una revisión del manual** para no arrancar de cero al crear la
    siguiente.

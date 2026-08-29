@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, currentSession, OfflineError, setSession, type RecordTypeSummary, type Rol, type Session, type Vessel } from './lib/api.ts';
+import { dependenciasDeSync } from './lib/deps.ts';
 import { buquePorDefecto, navegaABordo, trabajaEnTierra } from './lib/roles.ts';
 import { ir, useEnLinea, useRuta } from './lib/router.ts';
 import { syncAll } from './lib/sync.ts';
@@ -89,15 +90,7 @@ export function App() {
       setAvisoSync(null);
       return;
     }
-    const tally = await syncAll(
-      pendientes,
-      {
-        createRecord: api.createRecord,
-        updateRecord: api.updateRecord,
-        isOffline: (err) => err instanceof OfflineError,
-      },
-      drafts.save,
-    );
+    const tally = await syncAll(pendientes, dependenciasDeSync, drafts.save);
     await recargarBorradores();
     setAvisoSync(
       tally.offline > 0

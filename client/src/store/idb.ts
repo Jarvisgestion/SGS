@@ -4,9 +4,10 @@
  * que hay conexión para sincronizarlos.
  */
 const DB_NAME = 'sgs';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 export const DRAFTS = 'drafts';
 export const CACHE = 'cache';
+export const ARCHIVOS = 'archivos';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -17,6 +18,11 @@ function open(): Promise<IDBDatabase> {
       const db = req.result;
       if (!db.objectStoreNames.contains(DRAFTS)) db.createObjectStore(DRAFTS, { keyPath: 'localId' });
       if (!db.objectStoreNames.contains(CACHE)) db.createObjectStore(CACHE);
+      if (!db.objectStoreNames.contains(ARCHIVOS)) {
+        // Los archivos adjuntos esperan acá hasta que haya señal para subirlos.
+        const store = db.createObjectStore(ARCHIVOS, { keyPath: 'ref' });
+        store.createIndex('por_borrador', 'draftLocalId');
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -39,6 +45,8 @@ function run<T>(store: string, mode: IDBTransactionMode, fn: (s: IDBObjectStore)
 export const idb = {
   get: <T>(store: string, key: IDBValidKey) => run<T | undefined>(store, 'readonly', (s) => s.get(key) as IDBRequest<T | undefined>),
   getAll: <T>(store: string) => run<T[]>(store, 'readonly', (s) => s.getAll() as IDBRequest<T[]>),
+  getAllPorIndice: <T>(store: string, indice: string, valor: IDBValidKey) =>
+    run<T[]>(store, 'readonly', (s) => s.index(indice).getAll(valor) as IDBRequest<T[]>),
   put: <T>(store: string, value: T, key?: IDBValidKey) =>
     run(store, 'readwrite', (s) => s.put(value as unknown as object, key)),
   delete: (store: string, key: IDBValidKey) => run(store, 'readwrite', (s) => s.delete(key)),

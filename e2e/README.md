@@ -23,6 +23,8 @@ Qué cubre:
   lista de opciones y bloque de firma), y el capitán lo carga y lo firma a
   bordo, sin que cambie una línea de código. Después verifica que editar el
   formulario suba la versión sin alterar lo ya cargado.
+- **Foto sin señal** — se saca una foto fuera de cobertura, se reabre la app
+  todavía sin señal y la foto sigue ahí; al volver la conexión se sube sola.
 - **Tablero** — cumplimiento (RA-06C) y certificados vencidos.
 - **`capturas.spec.ts`** — no verifica nada: genera las imágenes de `capturas/`.
 

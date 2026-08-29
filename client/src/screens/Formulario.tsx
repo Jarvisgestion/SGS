@@ -12,7 +12,9 @@ import {
   type Field,
   type FormData,
 } from '../lib/schema.ts';
+import { dependenciasDeSync } from '../lib/deps.ts';
 import { syncDraft } from '../lib/sync.ts';
+import { archivos, esReferenciaLocal } from '../store/archivos.ts';
 import { cache } from '../store/idb.ts';
 import { drafts, newDraft, type Draft } from '../store/drafts.ts';
 import { CampoDinamico } from '../components/Fields.tsx';
@@ -92,6 +94,29 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
   );
 
   /**
+   * La sincronización corre de fondo y puede resolver, mientras esta pantalla
+   * está abierta, los archivos que esperaban señal. Se toma de ahí sólo eso y
+   * el id que dio tierra: el resto de lo que hay en pantalla es más nuevo.
+   */
+  useEffect(() => {
+    if (!borrador) return;
+    const sincronizado = ctx.borradores.find((b) => b.localId === borrador.localId);
+    if (!sincronizado) return;
+
+    const resueltos = soloArchivosResueltos(sincronizado.data, borrador.data);
+    const apareceServerId = !borrador.serverId && sincronizado.serverId;
+    if (Object.keys(resueltos).length === 0 && !apareceServerId) return;
+
+    const siguiente = {
+      ...borrador,
+      data: { ...borrador.data, ...resueltos },
+      serverId: borrador.serverId ?? sincronizado.serverId,
+    };
+    actual.current = siguiente;
+    setBorrador(siguiente);
+  }, [ctx.borradores, borrador]);
+
+  /**
    * Si la app se cierra (se apaga la tablet, se mata la aplicación) hay que
    * bajar lo pendiente antes de irse: el retardo del autoguardado no puede
    * costarle a nadie lo último que escribió.
@@ -128,6 +153,12 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
 
   function cambiar(key: string, value: unknown) {
     const base = actual.current!;
+
+    // Si el campo tenía un archivo que todavía no había subido y se lo cambia o
+    // se lo quita, ese archivo ya no lo referencia nadie: se suelta del equipo.
+    const anterior = base.data[key];
+    if (esReferenciaLocal(anterior) && anterior !== value) void archivos.borrar(anterior);
+
     guardarLocal({ ...base, data: { ...base.data, [key]: value }, dirty: true });
   }
 
@@ -137,28 +168,32 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
     if (base.serverId && !base.dirty) return base;
 
     const payload = { ...base, data: toPayload(tipo!.field_schema, base.data) };
-    const salida = await syncDraft(payload, {
-      createRecord: api.createRecord,
-      updateRecord: api.updateRecord,
-      isOffline: (err) => err instanceof OfflineError,
-    });
+    const salida = await syncDraft(payload, dependenciasDeSync);
     if (salida.result === 'offline') throw new OfflineError();
     if (salida.result === 'rejected') throw new ApiError(422, salida.error);
 
     // Se parte de actual.current y no de `base`: mientras subía, alguien pudo
-    // seguir completando el formulario.
-    const actualizado = { ...actual.current!, serverId: salida.draft.serverId, dirty: false };
+    // seguir completando el formulario. Los datos sí vienen de la salida: ahí
+    // están las referencias de archivo ya reemplazadas por el id de tierra.
+    const actualizado = {
+      ...actual.current!,
+      data: { ...actual.current!.data, ...soloArchivosResueltos(salida.draft.data, actual.current!.data) },
+      serverId: salida.draft.serverId,
+      dirty: false,
+    };
     actual.current = actualizado;
     await drafts.save(actualizado);
     setBorrador(actualizado);
     return actualizado;
   }
 
-  /** Sube un archivo al registro, creándolo en tierra si todavía no existía. */
-  async function subirArchivo(archivo: File): Promise<string> {
-    const conId = await asegurarEnTierra();
-    const adjunto = await api.subirAdjunto(conId.serverId!, archivo, archivo.name);
-    return adjunto.id;
+  /**
+   * Guarda el archivo en el equipo y devuelve su referencia. La subida a tierra
+   * es parte de la sincronización: sacar una foto no puede depender de que en
+   * ese momento haya señal.
+   */
+  async function guardarArchivo(fieldKey: string, archivo: File): Promise<string> {
+    return archivos.guardar(actual.current!.localId, fieldKey, archivo);
   }
 
   async function firmar(bloque: Field, entrada: { pin?: string; imagen?: Blob; method?: 'canvas' | 'pin' }) {
@@ -267,7 +302,7 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
               field={f}
               value={borrador.data[f.key]}
               error={intentoEnviar ? erroresPorCampo.get(f.key) : undefined}
-              subirArchivo={ctx.enLinea ? subirArchivo : undefined}
+              guardarArchivo={(archivo) => guardarArchivo(f.key, archivo)}
               onChange={(v) => cambiar(f.key, v)}
             />
           ))}
@@ -341,6 +376,21 @@ export function Formulario({ ctx, recordTypeId, localId }: Props) {
       )}
     </>
   );
+}
+
+/**
+ * De lo que devolvió la sincronización sólo interesan los campos de archivo que
+ * pasaron de referencia local a id de tierra: el resto de lo que se cargó
+ * mientras tanto es más nuevo que lo que viajó.
+ */
+function soloArchivosResueltos(deTierra: FormData, local: FormData): FormData {
+  const resueltos: FormData = {};
+  for (const [clave, valor] of Object.entries(local)) {
+    if (esReferenciaLocal(valor) && !esReferenciaLocal(deTierra[clave]) && deTierra[clave]) {
+      resueltos[clave] = deTierra[clave];
+    }
+  }
+  return resueltos;
 }
 
 /**

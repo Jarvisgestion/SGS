@@ -30,6 +30,9 @@ function deps(overrides: Partial<SyncDeps> = {}): SyncDeps {
     createRecord: async () => ({ id: 'servidor-1' }),
     updateRecord: async () => undefined,
     isOffline: (err) => err instanceof SinSenal,
+    archivosPendientes: async () => [],
+    subirArchivo: async () => ({ id: 'adjunto-1' }),
+    archivoSubido: async () => {},
     ...overrides,
   };
 }
@@ -149,5 +152,104 @@ describe('sincronización de la cola', () => {
     );
 
     assert.deepEqual(tally, { synced: 1, offline: 0, rejected: 1 });
+  });
+});
+
+describe('archivos que esperaron señal', () => {
+  const foto = {
+    ref: 'local:abc',
+    fieldKey: 'foto',
+    nombre: 'siniestro.png',
+    contenido: new Blob(['png']),
+  };
+
+  it('no manda la referencia local a tierra', async () => {
+    let enviado: Record<string, unknown> | undefined;
+    await syncDraft(
+      borrador({ data: { descripcion: 'humo', foto: foto.ref } }),
+      deps({
+        createRecord: async (body) => {
+          enviado = body.data;
+          return { id: 'servidor-1' };
+        },
+        archivosPendientes: async () => [foto],
+      }),
+    );
+    assert.deepEqual(enviado, { descripcion: 'humo' });
+  });
+
+  it('sube el archivo y deja el id de tierra en el campo', async () => {
+    const salida = await syncDraft(
+      borrador({ data: { foto: foto.ref } }),
+      deps({
+        archivosPendientes: async () => [foto],
+        subirArchivo: async () => ({ id: 'adjunto-9' }),
+      }),
+    );
+    assert.equal(salida.result, 'synced');
+    assert.equal(salida.draft.data.foto, 'adjunto-9');
+  });
+
+  it('el archivo se sube después de crear el registro, no antes', async () => {
+    const orden: string[] = [];
+    await syncDraft(
+      borrador({ data: { foto: foto.ref } }),
+      deps({
+        createRecord: async () => {
+          orden.push('crear');
+          return { id: 'servidor-1' };
+        },
+        archivosPendientes: async () => [foto],
+        subirArchivo: async () => {
+          orden.push('subir');
+          return { id: 'adjunto-9' };
+        },
+        updateRecord: async () => {
+          orden.push('actualizar');
+        },
+      }),
+    );
+    assert.deepEqual(orden, ['crear', 'subir', 'actualizar']);
+  });
+
+  it('suelta el archivo del equipo recién cuando está en tierra', async () => {
+    const soltados: string[] = [];
+    await syncDraft(
+      borrador({ data: { foto: foto.ref } }),
+      deps({
+        archivosPendientes: async () => [foto],
+        archivoSubido: async (ref) => {
+          soltados.push(ref);
+        },
+      }),
+    );
+    assert.deepEqual(soltados, ['local:abc']);
+  });
+
+  it('sin señal el archivo queda en el equipo', async () => {
+    const soltados: string[] = [];
+    const salida = await syncDraft(
+      borrador({ data: { foto: foto.ref } }),
+      deps({
+        createRecord: async () => {
+          throw new SinSenal();
+        },
+        archivosPendientes: async () => [foto],
+        archivoSubido: async (ref) => {
+          soltados.push(ref);
+        },
+      }),
+    );
+    assert.equal(salida.result, 'offline');
+    assert.deepEqual(soltados, []);
+    assert.equal(salida.draft.data.foto, 'local:abc');
+  });
+
+  it('si el campo cambió mientras no había señal, no se pisa', async () => {
+    const salida = await syncDraft(
+      borrador({ data: { foto: 'local:otra' } }),
+      deps({ archivosPendientes: async () => [foto] }),
+    );
+    assert.equal(salida.draft.data.foto, 'local:otra');
   });
 });

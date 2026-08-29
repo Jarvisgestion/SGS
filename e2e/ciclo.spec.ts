@@ -203,3 +203,43 @@ test('el tablero muestra el cumplimiento y los desvíos', async ({ page }) => {
   await expect(page.getByText('vencido').first()).toBeVisible();
 
 });
+
+// La foto se saca a bordo, donde muchas veces no hay cobertura: tiene que
+// quedar en el equipo y subirse sola cuando vuelve la señal.
+test.describe('foto sin señal', () => {
+  test.use({ baseURL: 'http://127.0.0.1:3000' });
+
+  test('la foto sacada sin cobertura se sube al recuperar la señal', async ({ page, context }) => {
+    await entrar(page, CREDENCIALES.capitan);
+    await page.reload();
+    await expect(page.getByRole('link', { name: /RE-01D/ })).toBeVisible();
+    await page.waitForLoadState('networkidle');
+
+    await context.setOffline(true);
+    await page.getByRole('link', { name: /RE-01D/ }).click();
+    await page.getByLabel(/Descripción del siniestro/).fill('Humo en el pañol de proa');
+    await page.getByLabel('Foto del siniestro').setInputFiles({
+      name: 'sin-senal.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    });
+
+    // se ve la foto y se avisa que todavía está en el equipo
+    await expect(page.getByRole('img', { name: 'Adjunto' })).toBeVisible();
+    await expect(page.getByText('Guardado en el equipo')).toBeVisible();
+
+    // sobrevive a reabrir la app, todavía sin señal
+    await page.waitForURL(/#\/borrador\//);
+    await page.reload();
+    await expect(page.getByRole('img', { name: 'Adjunto' })).toBeVisible();
+
+    // al volver la señal se sube sola y deja de estar pendiente
+    await context.setOffline(false);
+    await page.reload();
+    await expect(page.getByText('Guardado en el equipo')).toBeHidden({ timeout: 20_000 });
+    await expect(page.getByRole('img', { name: 'Adjunto' })).toBeVisible();
+  });
+});
