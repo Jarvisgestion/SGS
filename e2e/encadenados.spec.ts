@@ -41,7 +41,7 @@ test('un incendio con heridos exige el acaecimiento médico y queda enlazado', a
   await page.getByRole('button', { name: 'Enviar a tierra' }).click();
 
   // enviado: la obligación queda a la vista sobre el propio hecho
-  await expect(page.getByText('En revisión')).toBeVisible();
+  await expect(page.locator('.chip', { hasText: 'En revisión' })).toBeVisible();
   await expect(page.locator('.aviso').filter({ hasText: 'exige cargar además' })).toContainText('RO-07A');
 
   // y se puede cumplir desde ahí mismo, enlazado

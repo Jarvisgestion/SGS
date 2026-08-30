@@ -64,6 +64,20 @@ la solapa **Catálogo**, con lo que ese rol puede editar y nada más:
 - **Flota** y **Personas** — buques, altas de personal, asignación y cierre de
   roles (que es como se documenta un cambio de mando).
 
+## El registro impreso
+
+Un inspector de PNA no mira la pantalla: pide el registro. Un registro
+aprobado se imprime —o se guarda como PDF desde el navegador— con el encabezado
+que llevan todos los formularios del manual (empresa, norma, revisión,
+procedimiento, buque, matrícula, marea, fecha), los datos como se cargaron, las
+firmas con su aclaración y su método, y el historial de revisión.
+
+Está resuelto con una hoja de estilos de impresión, no con un generador de PDF
+del lado del servidor: no agrega una dependencia pesada, funciona sin conexión y
+sale igual desde cualquier equipo. Al imprimir desaparece todo lo que es de la
+aplicación —navegación, botones, avisos— y de cada grupo de respuestas queda
+sólo la elegida, en línea con la pregunta.
+
 ## Decisiones que conviene conocer
 
 - **El borrador se sube al salir del formulario**, no sólo al enviarlo: si no,

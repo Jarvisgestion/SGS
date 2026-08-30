@@ -127,6 +127,11 @@ export async function recordRoutes(app: FastifyInstance) {
     const { rows } = await app.db.query(
       `SELECT ri.*, rt.code AS record_type_code, rt.name AS record_type_name,
               rt.signature_requirement, rtv.field_schema,
+              -- Encabezado del formulario impreso: es el que lleva todo
+              -- registro del manual (empresa, norma, revisión, buque).
+              c.name AS company_name, c.cuit AS company_cuit,
+              v.name AS vessel_name, v.matricula AS vessel_matricula,
+              mv.revision_number, mv.regulation, p.code AS procedure_code,
               (SELECT json_agg(json_build_object(
                         'id', s.id, 'signer_name', s.signer_name, 'signer_role', s.signer_role,
                         'field_key', s.field_key, 'method', s.method, 'signed_at', s.signed_at,
@@ -159,6 +164,10 @@ export async function recordRoutes(app: FastifyInstance) {
                 WHERE pc.record_instance_id = ri.id) AS pending_children
          FROM record_instances ri
          JOIN record_types rt ON rt.id = ri.record_type_id
+         JOIN procedures p ON p.id = rt.procedure_id
+         JOIN manual_versions mv ON mv.id = p.manual_version_id
+         JOIN companies c ON c.id = ri.company_id
+         LEFT JOIN vessels v ON v.id = ri.vessel_id
          JOIN record_type_versions rtv
            ON rtv.record_type_id = ri.record_type_id AND rtv.version = ri.record_type_version
         WHERE ri.id = $1 AND ri.company_id = $2`,

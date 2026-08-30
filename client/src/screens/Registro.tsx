@@ -112,7 +112,50 @@ export function Registro({ ctx, id }: { ctx: Contexto; id: string }) {
 
   return (
     <>
-      <section className="panel">
+      {/* Encabezado del formulario, igual al que lleva todo registro del manual. */}
+      <header className="encabezado-registro">
+        <div className="titulo-mgs">
+          <span className="empresa">{registro.company_name}</span>
+          <span>{registro.regulation ?? 'Sistema de Gestión de Seguridad'}</span>
+        </div>
+        <div className="campos">
+          <div>
+            <span className="k">Registro</span>
+            {registro.record_type_code} — {registro.record_type_name}
+          </div>
+          <div>
+            <span className="k">Procedimiento</span>
+            {registro.procedure_code}
+          </div>
+          <div>
+            <span className="k">Revisión</span>
+            {registro.revision_number}
+          </div>
+          <div>
+            <span className="k">Buque</span>
+            {registro.vessel_name ?? '—'}
+          </div>
+          <div>
+            <span className="k">Matrícula</span>
+            {registro.vessel_matricula ?? '—'}
+          </div>
+          <div>
+            <span className="k">Marea / Singladura</span>
+            {registro.marea ?? '—'}
+          </div>
+          <div>
+            <span className="k">Fecha del hecho</span>
+            {new Date(registro.occurred_at).toLocaleString('es-AR')}
+          </div>
+          <div>
+            <span className="k">Estado</span>
+            {ETIQUETA_ESTADO[registro.status]}
+          </div>
+        </div>
+      </header>
+
+      {/* En papel esto lo dice el encabezado del formulario. */}
+      <section className="panel no-imprimir">
         <h2>
           <span className="codigo">{registro.record_type_code}</span> · {registro.record_type_name}
         </h2>
@@ -221,24 +264,22 @@ export function Registro({ ctx, id }: { ctx: Contexto; id: string }) {
         {(registro.signatures ?? []).length === 0 ? (
           <p className="vacio">Sin firmas.</p>
         ) : (
-          (registro.signatures ?? []).map((f) => (
-            <div className="dato" key={f.id}>
-              <span className="k">{f.signer_role.replace(/_/g, ' ')}</span>
-              <span className="v">
-                {f.signer_name}
-                <br />
+          <div className="pie-firmas">
+            {(registro.signatures ?? []).map((f) => (
+              <div className="casillero" key={f.id}>
+                {f.signature_image_id && <VistaAdjunto referencia={f.signature_image_id} alto={70} />}
+                <strong>{f.signer_name}</strong>
+                <div className="rol">
+                  {ctx.roles.find((r) => r.code === f.signer_role)?.name ??
+                    f.signer_role.replace(/_/g, ' ')}
+                </div>
                 <small style={{ color: 'var(--tenue)' }}>
                   {f.method === 'pin' ? 'Confirmado con PIN' : 'Firma manuscrita'} ·{' '}
                   {new Date(f.signed_at).toLocaleString('es-AR')}
                 </small>
-                {f.signature_image_id && (
-                  <div style={{ marginTop: 6 }}>
-                    <VistaAdjunto referencia={f.signature_image_id} alto={90} />
-                  </div>
-                )}
-              </span>
-            </div>
-          ))
+              </div>
+            ))}
+          </div>
         )}
       </section>
 
@@ -286,6 +327,12 @@ export function Registro({ ctx, id }: { ctx: Contexto; id: string }) {
           </div>
         </section>
       )}
+
+      <div className="acciones">
+        <button type="button" className="boton secundario" onClick={() => window.print()}>
+          Imprimir o guardar como PDF
+        </button>
+      </div>
 
       {error && registro && !puedeRevisar && <div className="aviso error">{error}</div>}
     </>

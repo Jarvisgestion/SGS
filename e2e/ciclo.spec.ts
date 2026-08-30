@@ -78,7 +78,7 @@ test('el capitán carga un incendio, lo firma y lo envía; tierra lo observa y d
 
   // --- envío
   await page.getByRole('button', { name: 'Enviar a tierra' }).click();
-  await expect(page.getByText('En revisión')).toBeVisible();
+  await expect(page.locator('.chip', { hasText: 'En revisión' })).toBeVisible();
 
   // --- tierra observa
   await salir(page);
@@ -87,7 +87,7 @@ test('el capitán carga un incendio, lo firma y lo envía; tierra lo observa y d
   await page.getByRole('link', { name: /RE-01D/ }).click();
   await page.getByLabel(/Comentario/).fill('Detallá cómo se destrabó la ventilación');
   await page.getByRole('button', { name: 'Observar' }).click();
-  await expect(page.getByText('Observado').first()).toBeVisible();
+  await expect(page.locator('.chip', { hasText: 'Observado' }).first()).toBeVisible();
 
   // --- vuelve a bordo con la observación a la vista
   await salir(page);
@@ -103,7 +103,7 @@ test('el capitán carga un incendio, lo firma y lo envía; tierra lo observa y d
     'Principio de incendio en sala de máquinas. La ventilación se cerró a mano.',
   );
   await page.getByRole('button', { name: 'Enviar a tierra' }).click();
-  await expect(page.getByText('En revisión')).toBeVisible();
+  await expect(page.locator('.chip', { hasText: 'En revisión' })).toBeVisible();
 
   // --- tierra aprueba y el registro queda cerrado
   await salir(page);
@@ -111,7 +111,7 @@ test('el capitán carga un incendio, lo firma y lo envía; tierra lo observa y d
   await page.getByRole('link', { name: 'Para revisar' }).click();
   await page.getByRole('link', { name: /RE-01D/ }).click();
   await page.getByRole('button', { name: 'Aprobar' }).click();
-  await expect(page.getByText('Aprobado').first()).toBeVisible();
+  await expect(page.locator('.chip', { hasText: 'Aprobado' }).first()).toBeVisible();
 
   // el historial conserva las dos decisiones, la firma y la foto
   await expect(page.getByText('Detallá cómo se destrabó la ventilación')).toBeVisible();

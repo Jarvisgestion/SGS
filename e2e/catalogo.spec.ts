@@ -80,7 +80,7 @@ test('la Persona Designada crea un formulario nuevo y el capitán lo carga', asy
   await expect(page.getByRole('button', { name: 'Ya firmado' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Enviar a tierra' }).click();
-  await expect(page.getByText('En revisión')).toBeVisible();
+  await expect(page.locator('.chip', { hasText: 'En revisión' })).toBeVisible();
 });
 
 test('editar el formulario sube la versión y no toca lo ya cargado', async ({ page }) => {

@@ -30,6 +30,9 @@ Qué cubre:
 - **`encadenados.spec.ts`** — un incendio con heridos exige el acaecimiento
   médico: la obligación queda asentada sobre el hecho, se cumple desde ahí
   enlazada, y la cadena se ve desde los dos lados.
+- **`impresion.spec.ts`** — carga y aprueba un registro, y genera su PDF
+  comprobando que lleve el encabezado del formulario, las firmas y el historial,
+  y que no salgan la navegación ni los botones de la aplicación.
 - **Tablero** — cumplimiento (RA-06C) y certificados vencidos.
 - **`capturas.spec.ts`** — no verifica nada: genera las imágenes de `capturas/`.
 

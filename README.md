@@ -15,6 +15,7 @@ empresa.
 | API HTTP | `api/` | Ciclo de registro y ABM del catálogo |
 | Cliente a bordo y de tierra | `client/` | Carga sin señal, firma, revisión, tablero y edición del manual |
 | Despliegue | `Dockerfile`, `DEPLOY.md` | Un solo contenedor: API y app en el mismo origen |
+| Registro impreso para PNA | `client/` | Encabezado del manual, firmas e historial |
 | Resguardos y seguridad | `scripts/backup*.sh`, `docs/04-seguridad.md` | Restauración probada; repaso con lo corregido y lo abierto |
 | Prueba del circuito completo | `e2e/` | En navegador real, sobre la base real |
 | Catálogo real de Xeitosiño / Pesantar | — | Pendiente del relevamiento |

@@ -232,6 +232,14 @@ export interface RecordDetail {
   record_type_id: string;
   record_type_code: string;
   record_type_name: string;
+  /** Datos del encabezado que lleva todo formulario del manual. */
+  company_name: string;
+  company_cuit: string | null;
+  vessel_name: string | null;
+  vessel_matricula: string | null;
+  revision_number: string;
+  regulation: string | null;
+  procedure_code: string;
   signature_requirement: SignatureRequirement;
   field_schema: Field[];
   vessel_id: string | null;
