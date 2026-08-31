@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { queryUnscoped } from '../db.js';
 import { issueToken, loadUser, requireAuth, verifySecret } from '../auth.js';
+import { config } from '../config.js';
 import { HttpError, wrap } from '../errors.js';
 
 export const authRouter: Router = Router();
@@ -25,5 +26,8 @@ authRouter.post('/auth/login', wrap(async (req, res) => {
 }));
 
 authRouter.get('/me', requireAuth, wrap(async (req, res) => {
-  res.json({ user: req.user });
+  res.json({
+    user: req.user,
+    pilotProcedures: config.pilotProcedures.length ? config.pilotProcedures : null,
+  });
 }));

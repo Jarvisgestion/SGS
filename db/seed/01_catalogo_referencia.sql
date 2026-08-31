@@ -28,7 +28,9 @@ CREATE FUNCTION pg_temp.seed_rt(
   p_reviewers        text[]  DEFAULT '{persona_designada,asesor_externo}',
   p_signature        text    DEFAULT 'configurable_por_firmante',
   p_field_schema     jsonb   DEFAULT '[]'::jsonb,
-  p_sort             integer DEFAULT 0
+  p_sort             integer DEFAULT 0,
+  p_requires_attachment boolean DEFAULT false,
+  p_nota             text    DEFAULT NULL
 ) RETURNS uuid LANGUAGE plpgsql AS $fn$
 DECLARE
   v_company uuid;
@@ -44,13 +46,14 @@ BEGIN
   INSERT INTO record_type_versions (
     record_type_id, company_id, version, recurrence_type, recurrence_days,
     allowed_creator_roles, allowed_reviewer_roles, signature_requirement,
-    field_schema, change_description, effective_from, status)
+    field_schema, requires_signed_attachment, change_description, effective_from, status)
   VALUES (
     v_rt, v_company, 1, p_recurrence_type, p_recurrence_days,
-    p_creators, p_reviewers, p_signature, p_field_schema,
-    CASE WHEN p_field_schema = '[]'::jsonb
-         THEN 'Estructura relevada. Campos pendientes de relevar del formulario real de la empresa.'
-         ELSE 'Versión inicial, campos relevados del formulario.' END,
+    p_creators, p_reviewers, p_signature, p_field_schema, p_requires_attachment,
+    coalesce(p_nota,
+      CASE WHEN p_field_schema = '[]'::jsonb
+           THEN 'Estructura relevada. Campos pendientes de relevar del formulario real de la empresa.'
+           ELSE 'Versión inicial, campos relevados del formulario.' END),
     current_date, 'vigente')
   RETURNING id INTO v_ver;
 
@@ -163,6 +166,18 @@ PERFORM pg_temp.seed_rt(p_mgs, 'RMGS-07', 'Nombramiento de Persona Designada',
 -- =========================================================================
 -- PE-01 — Emergencias
 -- =========================================================================
+-- Este es el procedimiento del piloto.
+--
+-- El único registro que exige el PDF del formulario en papel firmado
+-- (requires_signed_attachment) es RE-01A, el de zafarranchos. Los demás pueden
+-- llevar adjuntos igual — el esquema lo permite en cualquier registro — pero no
+-- los necesitan para poder aprobarse.
+--
+-- Procedencia de los campos: RE-01A, RE-01B y RE-01D salen del relevamiento
+-- (docs/01). RE-01C, RE-01E, RE-01R y el cronograma se derivaron del mismo patrón
+-- porque el relevamiento los describe pero no detalla sus campos — hay que
+-- contrastarlos contra el formulario real antes de usarlos a bordo.
+
 -- NOTA: el manual fija periodicidad por tipo de ejercicio (incendio/abandono 30 d,
 -- colisión/varadura/hombre al agua/sin gobierno/espacios confinados 60 d,
 -- buque-tierra 365 d). El modelo actual soporta UNA recurrencia por tipo de
@@ -183,11 +198,26 @@ PERFORM pg_temp.seed_rt(p_pe01, 'RE-01A', 'Ejercicio de Zafarrancho',
        {"key":"puesto","type":"text","label":"Puesto"}]},
     {"key":"observaciones","type":"textarea","label":"Observaciones"},
     {"key":"firma_capitan","type":"signature_block","label":"Capitán","signer_role":"capitan"}
-  ]$j$::jsonb, 10);
+  ]$j$::jsonb, 10, p_requires_attachment => true);
 
 PERFORM pg_temp.seed_rt(p_pe01, 'RE-01A-ANEXO', 'Cronograma anual de ejercicios',
   'master_data', 'vessel', 'fixed_interval_days', 365,
-  ARRAY['capitan','persona_designada'], ARRAY['persona_designada'], 'none', '[]'::jsonb, 20);
+  ARRAY['capitan','persona_designada'], ARRAY['persona_designada'], 'none',
+  $j$[
+    {"key":"anio","type":"number","label":"Año del cronograma","required":true},
+    {"key":"cronograma","type":"table","label":"Ejercicios programados","required":true,
+     "columns":[
+       {"key":"mes","type":"select","label":"Mes",
+        "options":["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio",
+                   "Agosto","Septiembre","Octubre","Noviembre","Diciembre"]},
+       {"key":"tipo_ejercicio","type":"select","label":"Tipo de ejercicio",
+        "options":["Incendio","Abandono","Colisión","Varadura","Hombre al agua",
+                   "Buque sin gobierno","Espacios confinados","Comunicación buque-tierra"]},
+       {"key":"fecha_prevista","type":"date","label":"Fecha prevista"},
+       {"key":"fecha_realizada","type":"date","label":"Fecha realizada"}]},
+    {"key":"observaciones","type":"textarea","label":"Observaciones"},
+    {"key":"firma_capitan","type":"signature_block","label":"Capitán","signer_role":"capitan"}
+  ]$j$::jsonb, 20, p_nota => 'Campos derivados del cronograma anual descripto en el relevamiento (12 filas por tipo de ejercicio). A contrastar contra el formulario real.');
 
 PERFORM pg_temp.seed_rt(p_pe01, 'RE-01B', 'Buque sin Gobierno',
   'incident_event', 'vessel', 'on_event', NULL,
@@ -206,7 +236,24 @@ PERFORM pg_temp.seed_rt(p_pe01, 'RE-01B', 'Buque sin Gobierno',
 
 PERFORM pg_temp.seed_rt(p_pe01, 'RE-01C', 'Colisión',
   'incident_event', 'vessel', 'on_event', NULL,
-  ARRAY['capitan'], ARRAY['persona_designada'], 'configurable_por_firmante', '[]'::jsonb, 40);
+  ARRAY['capitan'], ARRAY['persona_designada'], 'configurable_por_firmante',
+  $j$[
+    {"key":"descripcion","type":"textarea","label":"Descripción del acaecimiento","required":true},
+    {"key":"posicion","type":"text","label":"Posición geográfica"},
+    {"key":"condiciones_meteo","type":"text","label":"Condiciones hidrometeorológicas"},
+    {"key":"otro_buque_nombre","type":"text","label":"Otro buque / objeto involucrado"},
+    {"key":"otro_buque_matricula","type":"text","label":"Matrícula del otro buque"},
+    {"key":"otro_buque_bandera","type":"text","label":"Bandera del otro buque"},
+    {"key":"danios_propios","type":"textarea","label":"Daños en el buque propio"},
+    {"key":"danios_terceros","type":"textarea","label":"Daños a terceros"},
+    {"key":"hay_via_agua","type":"boolean","label":"Hay vía de agua"},
+    {"key":"informa_compania","type":"boolean","label":"Se informa a Compañía"},
+    {"key":"informa_pna","type":"boolean","label":"Se informa a PNA"},
+    {"key":"hubo_heridos","type":"boolean","label":"Hubo heridos","triggers_record_type":"RO-07A"},
+    {"key":"necesita_remolque","type":"boolean","label":"Necesita remolque","triggers_record_type":"RE-01R"},
+    {"key":"firma_capitan","type":"signature_block","label":"Capitán","signer_role":"capitan"},
+    {"key":"firma_pd","type":"signature_block","label":"Persona Designada","signer_role":"persona_designada"}
+  ]$j$::jsonb, 40, p_nota => 'Campos derivados del patrón de RE-01B más los datos propios de una colisión. A contrastar contra el formulario real.');
 
 PERFORM pg_temp.seed_rt(p_pe01, 'RE-01D', 'Incendio',
   'incident_event', 'vessel', 'on_event', NULL,
@@ -228,11 +275,47 @@ PERFORM pg_temp.seed_rt(p_pe01, 'RE-01D', 'Incendio',
 
 PERFORM pg_temp.seed_rt(p_pe01, 'RE-01E', 'Varadura',
   'incident_event', 'vessel', 'on_event', NULL,
-  ARRAY['capitan'], ARRAY['persona_designada'], 'configurable_por_firmante', '[]'::jsonb, 60);
+  ARRAY['capitan'], ARRAY['persona_designada'], 'configurable_por_firmante',
+  $j$[
+    {"key":"descripcion","type":"textarea","label":"Descripción del acaecimiento","required":true},
+    {"key":"posicion","type":"text","label":"Posición geográfica"},
+    {"key":"condiciones_meteo","type":"text","label":"Condiciones hidrometeorológicas"},
+    {"key":"naturaleza_fondo","type":"select","label":"Naturaleza del fondo",
+     "options":["Arena","Fango","Piedra","Roca","Mixto","Desconocida"]},
+    {"key":"calados","type":"text","label":"Calados proa / popa"},
+    {"key":"estado_marea","type":"select","label":"Estado de marea",
+     "options":["Creciente","Bajante","Pleamar","Bajamar"]},
+    {"key":"intentos_zafada","type":"textarea","label":"Maniobras de zafada intentadas"},
+    {"key":"hay_via_agua","type":"boolean","label":"Hay vía de agua"},
+    {"key":"hay_derrame","type":"boolean","label":"Hay derrame de hidrocarburos"},
+    {"key":"informa_compania","type":"boolean","label":"Se informa a Compañía"},
+    {"key":"informa_pna","type":"boolean","label":"Se informa a PNA"},
+    {"key":"hubo_heridos","type":"boolean","label":"Hubo heridos","triggers_record_type":"RO-07A"},
+    {"key":"necesita_remolque","type":"boolean","label":"Necesita remolque","triggers_record_type":"RE-01R"},
+    {"key":"firma_capitan","type":"signature_block","label":"Capitán","signer_role":"capitan"},
+    {"key":"firma_pd","type":"signature_block","label":"Persona Designada","signer_role":"persona_designada"}
+  ]$j$::jsonb, 60, p_nota => 'Campos derivados del patrón de RE-01B más los datos propios de una varadura. A contrastar contra el formulario real.');
 
 PERFORM pg_temp.seed_rt(p_pe01, 'RE-01R', 'Remolque de emergencia',
   'incident_event', 'vessel', 'on_event', NULL,
-  ARRAY['capitan'], ARRAY['persona_designada'], 'configurable_por_firmante', '[]'::jsonb, 70);
+  ARRAY['capitan'], ARRAY['persona_designada'], 'configurable_por_firmante',
+  $j$[
+    {"key":"motivo","type":"textarea","label":"Motivo del remolque","required":true},
+    {"key":"rol","type":"select","label":"El buque actúa como","required":true,
+     "options":["Remolcado","Remolcador"]},
+    {"key":"otro_buque_nombre","type":"text","label":"Buque remolcador / remolcado","required":true},
+    {"key":"otro_buque_matricula","type":"text","label":"Matrícula del otro buque"},
+    {"key":"posicion_inicio","type":"text","label":"Posición al inicio del remolque"},
+    {"key":"posicion_fin","type":"text","label":"Posición al finalizar / puerto de destino"},
+    {"key":"hora_inicio","type":"datetime","label":"Inicio del remolque"},
+    {"key":"hora_fin","type":"datetime","label":"Fin del remolque"},
+    {"key":"elemento_remolque","type":"text","label":"Elemento de remolque empleado"},
+    {"key":"condiciones_meteo","type":"text","label":"Condiciones hidrometeorológicas"},
+    {"key":"informa_compania","type":"boolean","label":"Se informa a Compañía"},
+    {"key":"informa_pna","type":"boolean","label":"Se informa a PNA"},
+    {"key":"firma_capitan","type":"signature_block","label":"Capitán","signer_role":"capitan"},
+    {"key":"firma_pd","type":"signature_block","label":"Persona Designada","signer_role":"persona_designada"}
+  ]$j$::jsonb, 70, p_nota => 'Campos derivados de la descripción del relevamiento (posición geográfica y datos del buque remolcador/remolcado). A contrastar contra el formulario real.');
 
 -- =========================================================================
 -- PO-03 — Entrenamiento

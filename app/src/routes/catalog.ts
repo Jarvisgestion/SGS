@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import { withTenant } from '../db.js';
 import { requireAuth, type SessionUser } from '../auth.js';
+import { config } from '../config.js';
 import { HttpError, wrap } from '../errors.js';
+
+/** Procedimientos habilitados para carga, o null si están todos. */
+const pilotFilter = (): string[] | null =>
+  config.pilotProcedures.length ? config.pilotProcedures : null;
 
 export const catalogRouter: Router = Router();
 catalogRouter.use(requireAuth);
@@ -13,12 +18,16 @@ catalogRouter.get('/catalog', wrap(async (req, res) => {
   const u = user(req);
   const rows = await withTenant(u.companyId, u.id, async (tx) => {
     const { rows } = await tx.query(
-      `SELECT procedure_code, procedure_name, record_type_id, record_code, record_name,
-              category, scope, recurrence_type, recurrence_days, signature_requirement,
-              allowed_creator_roles, allowed_reviewer_roles, field_count
-         FROM v_record_type_current
-        WHERE record_type_status = 'vigente'
-        ORDER BY procedure_code, record_code`,
+      `SELECT rtc.procedure_code, rtc.procedure_name, rtc.record_type_id, rtc.record_code,
+              rtc.record_name, rtc.category, rtc.scope, rtc.recurrence_type,
+              rtc.recurrence_days, rtc.signature_requirement, rtc.allowed_creator_roles,
+              rtc.allowed_reviewer_roles, rtc.field_count, v.requires_signed_attachment
+         FROM v_record_type_current rtc
+         JOIN record_type_versions v ON v.id = rtc.current_version_id
+        WHERE rtc.record_type_status = 'vigente'
+          AND ($1::text[] IS NULL OR rtc.procedure_code = ANY($1))
+        ORDER BY rtc.procedure_code, rtc.record_code`,
+      [pilotFilter()],
     );
     return rows;
   });
@@ -46,9 +55,14 @@ catalogRouter.get('/catalog', wrap(async (req, res) => {
       canReview: r.allowed_reviewer_roles.length === 0
         || r.allowed_reviewer_roles.some((role: string) => u.roles.includes(role)),
       fieldCount: r.field_count,
+      requiresSignedAttachment: r.requires_signed_attachment,
     });
   }
-  res.json({ procedures: [...byProcedure.values()] });
+  res.json({
+    procedures: [...byProcedure.values()],
+    // La interfaz avisa que está en piloto y qué procedimientos abarca.
+    pilotProcedures: pilotFilter(),
+  });
 }));
 
 /** Definición completa del formulario de un tipo de registro. */
@@ -59,7 +73,9 @@ catalogRouter.get('/catalog/:recordTypeId', wrap(async (req, res) => {
       `SELECT record_type_id, record_code, record_name, category, scope,
               procedure_code, current_version_id, current_version, recurrence_type,
               recurrence_days, signature_requirement, allowed_creator_roles,
-              allowed_reviewer_roles, field_schema
+              allowed_reviewer_roles, field_schema,
+              (SELECT requires_signed_attachment FROM record_type_versions
+                WHERE id = current_version_id) AS requires_signed_attachment
          FROM v_record_type_current WHERE record_type_id = $1`,
       [req.params.recordTypeId],
     );
@@ -80,6 +96,7 @@ catalogRouter.get('/catalog/:recordTypeId', wrap(async (req, res) => {
     signatureRequirement: row.signature_requirement,
     allowedCreatorRoles: row.allowed_creator_roles,
     allowedReviewerRoles: row.allowed_reviewer_roles,
+    requiresSignedAttachment: row.requires_signed_attachment,
     fieldSchema: row.field_schema,
   });
 }));

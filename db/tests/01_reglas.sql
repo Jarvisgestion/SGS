@@ -167,6 +167,82 @@ PERFORM pg_temp.expect_fail(format(
      VALUES (%L,%L,%L,'aprobado','otra vez')$q$, v_new, v_company, u_pd),
   'revisar dos veces un registro ya cerrado');
 
+RAISE NOTICE '--- Respaldo en papel firmado (RE-01A) ---';
+DECLARE
+  rt_re01a2 uuid; rtv_re01a2 uuid; ri_zafa uuid; att_id uuid;
+BEGIN
+  SELECT id, current_version_id INTO rt_re01a2, rtv_re01a2
+    FROM record_types WHERE company_id = v_company AND code = 'RE-01A';
+
+  INSERT INTO record_instances (company_id, record_type_id, record_type_version_id,
+                                vessel_id, occurred_at, created_by, data, status)
+  -- Fecha vieja a propósito: si fuera de hoy, pasaría a ser el último zafarrancho
+  -- aprobado y rompería la comprobación de vencimiento de más abajo.
+  VALUES (v_company, rt_re01a2, rtv_re01a2, v_vessel, now() - interval '100 days', u_capitan,
+          jsonb_build_object(
+            'tipo_ejercicio','Incendio',
+            'tema_tratado','Ejercicio de prueba',
+            'asistentes', jsonb_build_array(
+              jsonb_build_object('nombre','Luis Ocampo','dni','20333444','puesto','Capitán'))),
+          'pendiente_revision')
+  RETURNING id INTO ri_zafa;
+
+  PERFORM pg_temp.expect_fail(format(
+    $q$INSERT INTO record_reviews (record_instance_id, company_id, reviewer_id, decision, comment)
+       VALUES (%L,%L,%L,'aprobado','ok')$q$, ri_zafa, v_company, u_pd),
+    'aprobar un RE-01A sin el formulario en papel firmado');
+
+  -- Observarlo sí se puede: justamente sirve para pedir el papel que falta.
+  INSERT INTO record_reviews (record_instance_id, company_id, reviewer_id, decision, comment)
+  VALUES (ri_zafa, v_company, u_pd, 'observado', 'Falta adjuntar el formulario firmado.');
+  PERFORM pg_temp.expect_ok(
+    (SELECT status = 'observado' FROM record_instances WHERE id = ri_zafa),
+    'observar un registro sin respaldo sí es posible');
+
+  UPDATE record_instances SET status = 'pendiente_revision' WHERE id = ri_zafa;
+
+  -- Un adjunto de otra clase no alcanza: tiene que ser el formulario firmado.
+  INSERT INTO attachments (company_id, record_instance_id, storage_key, file_name,
+                           file_type, mime_type, kind, uploaded_by)
+  VALUES (v_company, ri_zafa, 'test/foto-generica.jpg', 'foto.jpg', 'image',
+          'image/jpeg', 'evidencia', u_capitan);
+  PERFORM pg_temp.expect_fail(format(
+    $q$INSERT INTO record_reviews (record_instance_id, company_id, reviewer_id, decision, comment)
+       VALUES (%L,%L,%L,'aprobado','ok')$q$, ri_zafa, v_company, u_pd),
+    'una evidencia cualquiera no reemplaza al formulario firmado');
+
+  INSERT INTO attachments (company_id, record_instance_id, storage_key, file_name,
+                           file_type, mime_type, kind, uploaded_by)
+  VALUES (v_company, ri_zafa, 'test/re01a-firmado.pdf', 'RE-01A firmado.pdf', 'pdf',
+          'application/pdf', 'formulario_firmado', u_capitan)
+  RETURNING id INTO att_id;
+
+  INSERT INTO record_reviews (record_instance_id, company_id, reviewer_id, decision, comment)
+  VALUES (ri_zafa, v_company, u_pd, 'aprobado', NULL);
+  PERFORM pg_temp.expect_ok(
+    (SELECT status = 'aprobado' FROM record_instances WHERE id = ri_zafa),
+    'con el formulario firmado adjunto, el registro se aprueba');
+
+  PERFORM pg_temp.expect_fail(format(
+    $q$DELETE FROM attachments WHERE id = %L$q$, att_id),
+    'quitar el respaldo de un registro ya aprobado');
+  PERFORM pg_temp.expect_fail(format(
+    $q$INSERT INTO attachments (company_id, record_instance_id, storage_key, file_name,
+                                file_type, kind, uploaded_by)
+       VALUES (%L,%L,'test/otro.pdf','otro.pdf','pdf','evidencia',%L)$q$,
+    v_company, ri_zafa, u_capitan),
+    'agregar adjuntos a un registro ya aprobado');
+
+  -- Los registros de PE-01 que no exigen PDF se aprueban sin adjunto: se
+  -- completan en el sistema y se imprimen si PNA los pide.
+  PERFORM pg_temp.expect_ok(
+    (SELECT NOT requires_signed_attachment FROM record_type_versions rtv
+      JOIN record_types rt ON rt.id = rtv.record_type_id
+     WHERE rt.company_id = v_company AND rt.code = 'RE-01D'
+       AND rtv.id = rt.current_version_id),
+    'RE-01D no exige PDF: se completa en el sistema y se imprime');
+END;
+
 RAISE NOTICE '--- Firmas ---';
 PERFORM pg_temp.expect_fail(format(
   $q$INSERT INTO signatures (company_id, record_instance_id, signer_user_id, signer_role, method)

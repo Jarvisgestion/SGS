@@ -1,11 +1,17 @@
 import { renderForm, el } from './form.js';
+import { renderPrintable } from './print.js';
 
 const state = {
   token: localStorage.getItem('sgs.token'),
   user: null,
   view: 'catalogo',
   refs: { users: [], risks: [], vessels: [] },
+  pilotProcedures: null,
 };
+
+const fmtBytes = (n) => (n > 1024 * 1024
+  ? `${(n / 1024 / 1024).toFixed(1)} MB`
+  : `${Math.max(1, Math.round(n / 1024))} kB`);
 
 const DRAFTS_KEY = 'sgs.drafts';           // borradores locales pendientes de enviar
 const loadDrafts = () => JSON.parse(localStorage.getItem(DRAFTS_KEY) ?? '{}');
@@ -131,12 +137,16 @@ async function go(view, arg) {
 
 // ---------------------------------------------------------------- catálogo
 async function viewCatalogo() {
-  const { procedures } = await api('/catalog');
+  const { procedures, pilotProcedures } = await api('/catalog');
+  state.pilotProcedures = pilotProcedures;
   const wrap = el('div');
   wrap.append(el('div', { class: 'panel' }, [
     el('h2', { text: 'Catálogo de registros' }),
-    el('p', { class: 'hint', text: `${procedures.reduce((n, p) => n + p.recordTypes.length, 0)} tipos de registro en ${procedures.length} procedimientos. Nada de esto está en el código: sale del catálogo de la empresa.` }),
-  ]));
+    el('p', { class: 'hint', text: `${procedures.reduce((n, p) => n + p.recordTypes.length, 0)} tipos de registro. Nada de esto está en el código: sale del catálogo de la empresa.` }),
+    pilotProcedures
+      ? el('div', { class: 'notice', text: `Etapa de prueba: solo está habilitada la carga de ${pilotProcedures.join(', ')}. El resto del manual sigue cargado en el catálogo y se habilita cuando se decida avanzar.` })
+      : null,
+  ].filter(Boolean)));
 
   for (const proc of procedures) {
     const rows = el('tbody');
@@ -154,7 +164,7 @@ async function viewCatalogo() {
         el('td', { text: rt.name }),
         el('td', {}, [el('span', { class: 'muted', text: rt.category })]),
         el('td', { text: rt.recurrenceType === 'fixed_interval_days' ? `cada ${rt.recurrenceDays} días` : rt.recurrenceType }),
-        el('td', { text: rt.scope }),
+        el('td', { text: rt.requiresSignedAttachment ? 'PDF firmado obligatorio' : 'se completa e imprime' }),
         el('td', {}, [nuevo]),
       );
       rows.append(tr);
@@ -165,7 +175,7 @@ async function viewCatalogo() {
         el('thead', {}, [el('tr', {}, [
           el('th', { text: 'Código' }), el('th', { text: 'Registro' }),
           el('th', { text: 'Categoría' }), el('th', { text: 'Recurrencia' }),
-          el('th', { text: 'Alcance' }), el('th', { text: '' }),
+          el('th', { text: 'Respaldo' }), el('th', { text: '' }),
         ])]),
         rows,
       ]),
@@ -331,12 +341,19 @@ async function viewRegistro(id) {
     onTrigger: async (code) => {
       const { procedures } = await api('/catalog');
       const target = procedures.flatMap((p) => p.recordTypes).find((t) => t.code === code);
-      if (!target) { alert(`El catálogo de esta empresa no tiene un registro ${code}.`); return; }
+      if (!target) {
+        alert(state.pilotProcedures
+          ? `${code} no pertenece a ${state.pilotProcedures.join(', ')}, el único procedimiento habilitado en esta etapa de prueba. Por ahora registralo en papel.`
+          : `El catálogo de esta empresa no tiene un registro ${code}.`);
+        return;
+      }
       go('nuevo-hijo', { recordTypeId: target.id, parentId: r.id });
     },
   });
 
   const acciones = el('div', { class: 'row-actions' });
+  const imprimir = el('button', { text: 'Imprimir formulario' });
+  imprimir.addEventListener('click', () => go('imprimir', id));
   if (editable) {
     const guardar = el('button', { text: 'Guardar cambios' });
     guardar.addEventListener('click', async () => {
@@ -364,7 +381,11 @@ async function viewRegistro(id) {
     acciones.append(reabrir);
   }
   if (r.status === 'pendiente_revision' && r.canReview) {
-    const aprobar = el('button', { class: 'primary', text: 'Aprobar' });
+    const faltaRespaldo = r.backingStatus === 'falta_respaldo';
+    const aprobar = el('button', {
+      class: 'primary', text: 'Aprobar', disabled: faltaRespaldo,
+      title: faltaRespaldo ? 'Falta el formulario en papel firmado' : '',
+    });
     aprobar.addEventListener('click', async () => {
       try {
         await api(`/records/${id}/review`, { method: 'POST', body: JSON.stringify({ decision: 'aprobado' }) });
@@ -382,6 +403,7 @@ async function viewRegistro(id) {
     });
     acciones.append(aprobar, observar);
   }
+  acciones.append(imprimir);
 
   // Node.append() convierte null en el texto "null": hay que filtrar antes.
   panel.append(...[
@@ -390,6 +412,9 @@ async function viewRegistro(id) {
     r.status === 'aprobado'
       ? el('div', { class: 'notice', text: 'Registro aprobado. Es de solo lectura: la base rechaza cualquier modificación.' })
       : null,
+    r.status === 'pendiente_revision'
+      ? el('div', { class: 'notice', text: 'Enviado a revisión: los datos quedan en solo lectura hasta que tierra lo apruebe u observe. El formulario firmado se puede adjuntar igual.' })
+      : null,
     r.status === 'observado' && r.reviews.length
       ? el('div', { class: 'error', text: `Observado: ${r.reviews[r.reviews.length - 1].comment}` })
       : null,
@@ -397,6 +422,7 @@ async function viewRegistro(id) {
     acciones,
   ].filter(Boolean));
   wrap.append(panel);
+  wrap.append(panelAdjuntos(r, () => go('registro', id)));
 
   if (r.reviews.length) {
     const rows = el('tbody');
@@ -432,6 +458,129 @@ async function viewRegistro(id) {
     b.addEventListener('click', () => go('registro', r.parentId));
     wrap.append(el('div', { class: 'panel' }, [b]));
   }
+  return wrap;
+}
+
+
+// ---------------------------------------------------------------- adjuntos
+// Mientras PNA no habilite la firma digital, el PDF o la foto del formulario en
+// papel firmado a mano es la evidencia válida del registro. Los datos cargados
+// acá corren en paralelo: sirven para operar y controlar, no para acreditar.
+const TIPOS_ACEPTADOS = ['application/pdf', 'image/jpeg', 'image/png', 'image/heic', 'image/webp'];
+
+async function subirAdjunto(recordId, file, kind) {
+  let tipo = file.type;
+  if (!tipo) {
+    // Algunos navegadores no informan el tipo de un .heic sacado con el teléfono.
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    tipo = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+             png: 'image/png', heic: 'image/heic', webp: 'image/webp' }[ext] ?? '';
+  }
+  if (!TIPOS_ACEPTADOS.includes(tipo)) {
+    throw new Error(`No se puede subir "${file.name}": se aceptan PDF y fotos (JPEG, PNG, HEIC, WebP).`);
+  }
+  const qs = new URLSearchParams({ fileName: file.name, kind });
+  const res = await fetch(`/api/records/${recordId}/attachments?${qs}`, {
+    method: 'POST',
+    headers: { 'content-type': tipo, authorization: `Bearer ${state.token}` },
+    body: file,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Error ${res.status} al subir el archivo`);
+  }
+  return res.json();
+}
+
+function panelAdjuntos(r, recargar) {
+  const panel = el('div', { class: 'panel' });
+  const editable = r.status !== 'aprobado';
+
+  panel.append(el('h2', { text: 'Formulario en papel firmado' }));
+  panel.append(el('p', { class: 'hint', text: 'La firma digital todavía no está habilitada por PNA. El respaldo válido es el formulario en papel completado y firmado a mano, escaneado o fotografiado.' }));
+
+  if (r.requiresSignedAttachment) {
+    panel.append(r.backingStatus === 'con_respaldo'
+      ? el('div', { class: 'respaldo-ok', text: 'Respaldo en papel adjunto. El registro se puede aprobar.' })
+      : el('div', { class: 'respaldo-falta', text: 'Falta adjuntar el formulario firmado. Este registro no se puede aprobar sin él.' }));
+  }
+
+  const lista = el('div');
+  for (const a of r.attachments ?? []) {
+    const fila = el('div', { class: 'adjunto' });
+    const ver = el('button', { text: 'Ver', disabled: !a.descargable });
+    ver.addEventListener('click', async () => {
+      // El adjunto viaja con el token, así que no sirve un enlace directo.
+      const res = await fetch(`/api/attachments/${a.id}`, {
+        headers: { authorization: `Bearer ${state.token}` },
+      });
+      if (!res.ok) { showError(panel, 'No se pudo abrir el adjunto.'); return; }
+      const url = URL.createObjectURL(await res.blob());
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    });
+    fila.append(
+      el('span', { class: 'nombre', text: a.file_name ?? 'adjunto' }),
+      el('span', { class: 'meta',
+        text: `${a.kind === 'formulario_firmado' ? 'formulario firmado' : a.kind} · ${fmtBytes(a.byte_size ?? 0)} · ${a.uploaded_by_name ?? ''} · ${fmtDateTime(a.uploaded_at)}` }),
+      el('div', { class: 'spacer' }),
+      ver,
+    );
+    if (editable) {
+      const quitar = el('button', { class: 'danger', text: 'Quitar' });
+      quitar.addEventListener('click', async () => {
+        if (!confirm(`¿Quitar "${a.file_name}"?`)) return;
+        try {
+          await api(`/attachments/${a.id}`, { method: 'DELETE' });
+          recargar();
+        } catch (err) { showError(panel, err.message); }
+      });
+      fila.append(quitar);
+    }
+    lista.append(fila);
+  }
+  if (!(r.attachments ?? []).length) {
+    lista.append(el('p', { class: 'muted', text: 'Todavía no hay archivos adjuntos.' }));
+  }
+  panel.append(lista);
+
+  if (editable) {
+    const input = el('input', { type: 'file', accept: '.pdf,image/*', style: 'display:none' });
+    const zona = el('div', { class: 'dropzone',
+      text: 'Arrastrá el PDF o la foto del formulario firmado, o hacé clic para elegirlo.' });
+    const subir = async (files) => {
+      zona.textContent = 'Subiendo…';
+      try {
+        for (const f of files) await subirAdjunto(r.id, f, 'formulario_firmado');
+        recargar();
+      } catch (err) {
+        zona.textContent = 'Arrastrá el PDF o la foto del formulario firmado, o hacé clic para elegirlo.';
+        showError(panel, err.message);
+      }
+    };
+    zona.addEventListener('click', () => input.click());
+    input.addEventListener('change', () => { if (input.files.length) subir([...input.files]); });
+    zona.addEventListener('dragover', (e) => { e.preventDefault(); zona.classList.add('activo'); });
+    zona.addEventListener('dragleave', () => zona.classList.remove('activo'));
+    zona.addEventListener('drop', (e) => {
+      e.preventDefault(); zona.classList.remove('activo');
+      if (e.dataTransfer.files.length) subir([...e.dataTransfer.files]);
+    });
+    panel.append(el('div', { style: 'margin-top:.8rem' }, [zona, input]));
+  }
+  return panel;
+}
+
+// ---------------------------------------------------------------- impresión
+async function viewImprimir(id) {
+  const r = await api(`/records/${id}`);
+  const wrap = el('div');
+  const volver = el('button', { text: '← Volver al registro' });
+  volver.addEventListener('click', () => go('registro', id));
+  const imprimir = el('button', { class: 'primary', text: 'Imprimir / Guardar como PDF' });
+  imprimir.addEventListener('click', () => window.print());
+  wrap.append(el('div', { class: 'print-bar' }, [imprimir, volver]));
+  wrap.append(renderPrintable(r, state.refs));
   return wrap;
 }
 
@@ -593,6 +742,7 @@ const VIEWS = {
   nuevo: (id) => viewNuevo(id),
   'nuevo-hijo': ({ recordTypeId, parentId }) => viewNuevo(recordTypeId, parentId),
   registro: viewRegistro,
+  imprimir: viewImprimir,
 };
 
 async function boot() {

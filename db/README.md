@@ -40,6 +40,7 @@ db/
 | `0006_views` | Vistas de cumplimiento, vencimientos, bandeja de revisión y trazabilidad |
 | `0007_rls` | Aislamiento multi-empresa por Row Level Security + rol `sgs_app` |
 | `0008_auth_functions` | Funciones de login (`SECURITY DEFINER`): el único paso que atraviesa RLS, porque autenticar es previo a saber la empresa |
+| `0009_adjunto_firmado` | Adjunto del formulario en papel firmado (evidencia válida mientras PNA no habilite la firma digital) y la regla de que sin él no se aprueba |
 
 ## Cómo se conecta la aplicación
 
@@ -82,6 +83,10 @@ Verificadas por `db/tests/01_reglas.sql`:
 - **Sincronización:** `client_uuid` hace idempotente el reenvío tras un corte de
   señal.
 - **Roles:** no se solapan dos asignaciones del mismo rol y buque para una persona.
+- **Respaldo en papel:** un registro cuyo tipo declara `requires_signed_attachment`
+  no se puede aprobar sin un adjunto `kind = formulario_firmado`; observarlo sí se
+  puede (es la forma de pedirlo). Ya aprobado, sus adjuntos no se agregan ni se
+  quitan: son parte de la evidencia.
 - **Multi-empresa:** una empresa no ve datos ni catálogo de otra.
 
 ## Semilla
@@ -93,7 +98,8 @@ Verificadas por `db/tests/01_reglas.sql`:
 Se carga deliberadamente bajo una empresa demo y **no** bajo Xeitosiño ni Pesantar:
 si arrancan de cero o clonan este catálogo es una decisión pendiente.
 
-De los 44 tipos, **14 tienen `field_schema` completo** — los que quedaron
+Los **7 registros de PE-01** —el procedimiento del piloto— tienen su `field_schema`
+completo. De los 44 tipos en total, **18 tienen `field_schema` completo** — los que quedaron
 efectivamente relevados. Los otros 30 tienen la estructura (código, categoría,
 alcance, recurrencia, firmas, roles habilitados) pero `field_schema = '[]'`: sus
 campos salen del formulario real de cada empresa. Se distinguen con:

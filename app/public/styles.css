@@ -79,3 +79,76 @@ canvas.sigpad { border: 1px dashed var(--line); border-radius: var(--radius);
   padding: .05rem .5rem; font-size: .76rem; margin-left: .3rem; }
 .muted { color: var(--muted); }
 .readonly-note { font-size: .87rem; color: var(--muted); font-style: italic; }
+
+/* --------------------------------------------------------------------------
+   Adjuntos y estado del respaldo en papel
+   -------------------------------------------------------------------------- */
+.respaldo-falta { background: #fdf1d8; border: 1px solid #e8d49b; color: #7a5200;
+  padding: .6rem .8rem; border-radius: var(--radius); margin-bottom: .9rem; }
+.respaldo-ok { background: #dcf0e5; border: 1px solid #b5ddc6; color: #15603a;
+  padding: .6rem .8rem; border-radius: var(--radius); margin-bottom: .9rem; }
+.adjunto { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  padding: .5rem 0; border-bottom: 1px solid var(--line); }
+.adjunto .nombre { font-weight: 600; }
+.adjunto .meta { color: var(--muted); font-size: .84rem; }
+.dropzone { border: 2px dashed var(--line); border-radius: var(--radius);
+  padding: 1.1rem; text-align: center; color: var(--muted); }
+.dropzone.activo { border-color: var(--accent); background: #eef3f8; }
+
+/* --------------------------------------------------------------------------
+   Vista de impresión: reproduce el formulario en papel del MGS
+   -------------------------------------------------------------------------- */
+.hoja { background: #fff; color: #000; padding: 14mm; max-width: 210mm;
+  margin: 0 auto 1rem; box-shadow: 0 1px 6px rgba(0,0,0,.12); font-size: 11pt; }
+.p-encabezado, .p-ident, .p-tabla { width: 100%; border-collapse: collapse; }
+.p-encabezado td { border: 1px solid #000; padding: .3rem .5rem; vertical-align: middle; }
+.p-empresa { width: 26%; text-align: center; }
+.p-empresa-nombre { font-weight: 700; font-size: 1.05em; }
+.p-titulo { text-align: center; font-size: .95em; }
+.p-titulo-fuerte { font-weight: 700; letter-spacing: .02em; }
+.p-meta { font-size: .82em; white-space: nowrap; }
+.p-nombre { text-align: center; font-size: 1.1em; margin: .8rem 0 .6rem;
+  text-transform: uppercase; letter-spacing: .03em; }
+.p-ident { margin-bottom: .8rem; }
+.p-ident th, .p-ident td { border: 1px solid #000; padding: .28rem .45rem;
+  font-size: .85em; text-align: left; }
+.p-ident th { background: #eee; font-weight: 600; }
+.p-campo { margin-bottom: .55rem; }
+.p-campo.p-inline { display: flex; gap: .4rem; align-items: baseline; }
+.p-label { font-weight: 600; font-size: .88em; }
+.p-valor { flex: 1; }
+.p-caja { border: 1px solid #000; padding: .35rem .45rem; min-height: 2.4em;
+  white-space: pre-wrap; margin-top: .15rem; }
+.p-inline .p-valor { border-bottom: 1px dotted #666; }
+.p-opciones { display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; margin-top: .2rem; }
+.p-opcion { font-size: .92em; }
+.p-tabla { margin-top: .25rem; }
+.p-tabla th, .p-tabla td { border: 1px solid #000; padding: .3rem .4rem;
+  font-size: .85em; height: 1.7em; }
+.p-tabla th { background: #eee; }
+.p-section { border-bottom: 1px solid #000; margin: 1rem 0 .5rem; font-size: .95em; }
+.p-firmas { display: flex; gap: 2rem; margin-top: 2.4rem; page-break-inside: avoid; }
+.p-firma { flex: 1; text-align: center; }
+.p-firma-linea { border-top: 1px solid #000; margin-bottom: .25rem; }
+.p-firma-rol { font-weight: 600; font-size: .85em; }
+.p-firma-aclara { font-size: .78em; color: #333; }
+.p-traza { margin-top: 1.6rem; padding-top: .5rem; border-top: 1px solid #999;
+  font-size: .76em; color: #333; page-break-inside: avoid; }
+.p-traza .p-alerta { color: #8a1f1f; font-weight: 600; }
+.p-nota-legal { margin-top: .4rem; font-style: italic; }
+.print-bar { max-width: 210mm; margin: 1rem auto .5rem; display: flex; gap: .5rem; }
+
+@media print {
+  body { background: #fff; }
+  header.topbar, nav, .print-bar, #modal-root { display: none !important; }
+  main { padding: 0; max-width: none; }
+  .hoja { box-shadow: none; margin: 0; padding: 0; max-width: none; }
+  @page { size: A4; margin: 14mm; }
+}
+
+/* Un formulario en solo lectura tiene que verse distinto de uno editable:
+   si no, el capitán intenta corregir un registro ya enviado y no entiende
+   por qué no puede escribir. */
+input:disabled, select:disabled, textarea:disabled {
+  background: #f1f3f5; color: #3c4650; cursor: default; border-color: #e4e8ec;
+}

@@ -119,6 +119,15 @@ INSERT INTO signatures (company_id, record_instance_id, signer_user_id, signer_r
                         field_key, method)
 VALUES (v_company, ri_zafa, u_capitan, 'capitan', 'firma_capitan', 'pin');
 
+-- El zafarrancho exige el formulario en papel firmado: sin él no se puede
+-- aprobar. En la demo se registra la fila sin archivo real (storage_key nulo);
+-- las subidas de verdad pasan por la API.
+INSERT INTO attachments (company_id, record_instance_id, file_url, file_name,
+                         file_type, mime_type, kind, uploaded_by)
+VALUES (v_company, ri_zafa, '(demo) sin archivo real',
+        'RE-01A zafarrancho firmado.pdf', 'pdf', 'application/pdf',
+        'formulario_firmado', u_capitan);
+
 INSERT INTO record_reviews (record_instance_id, company_id, reviewer_id, decision, comment, reviewed_at)
 VALUES (ri_zafa, v_company, u_pd, 'aprobado', 'Conforme.', now() - interval '39 days');
 

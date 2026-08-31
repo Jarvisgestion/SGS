@@ -405,31 +405,32 @@ sin necesidad de un modo offline complejo.
   (`record_types.version`, y una tabla `procedure_revisions` opcional si se quiere
   guardar el texto de cada cambio), no como un registro operativo más.
 
-## 6. Próximos pasos
+## 6. Estado y próximos pasos
 
-Orden acordado con el cliente. El paso 5 (relevar el manual real) va al final
-porque los manuales de Xeitosiño y Pesantar están desactualizados y van a ser
-reformateados: no conviene bloquear el desarrollo esperándolos.
+**El alcance se replanteó:** esta etapa valida el circuito completo con un solo
+procedimiento, PE-01, antes de abrir el resto del manual. Ver `docs/05-piloto-pe-01.md`.
 
 1. **Esquema SQL y migraciones** — *hecho*. Ver `db/` y `docs/03-esquema-sql.md`.
-   PostgreSQL, SQL plano sin ORM, con semilla del catálogo de referencia (44 tipos
-   de registro) y pruebas que verifican que el motor hace cumplir las reglas.
 2. **Prototipo de aplicación** — *hecho*. Ver `app/` y `docs/04-prototipo.md`.
-   API en Node/TypeScript y un cliente de referencia que arma cualquier formulario
-   a partir de su `field_schema`, con el flujo completo borrador → revisión →
-   aprobado, firma por PIN o manuscrita, y borradores locales con reenvío
-   idempotente. El frontend definitivo (React u otro) puede reemplazar al cliente
-   de referencia sin tocar la API.
-3. **Refinar la definición funcional** — pendiente, y ahora es el cuello de botella.
-   Catálogo semilla (¿Xeitosiño y Pesantar arrancan de cero o clonan el catálogo de
-   referencia para editarlo?), pantalla de administración del catálogo, y los 30
-   formularios que todavía no tienen campos relevados.
-4. **Definir `signature_requirement` por tipo de registro** — pendiente de
-   confirmación de PNA sobre qué evidencia electrónica acepta. El esquema ya
-   soporta manuscrita, PIN, ambas o configurable por firmante; falta el criterio.
-5. **Cargar el manual de Xeitosiño / Pesantar y validar el modelo** — pendiente.
-   Es la prueba de fuego: confirmar que el esquema aguanta un catálogo distinto en
-   cantidad, códigos y campos, sin agregarle nada "a medida" de Chiarmar.
+3. **Piloto de PE-01 con respaldo en papel e impresión** — *hecho, falta probarlo
+   en uso real*. Los 7 registros de PE-01 con sus campos, el PDF del formulario
+   firmado obligatorio en RE-01A, y la impresión con formato de formulario para los
+   demás. Ver `docs/05-piloto-pe-01.md`.
+4. **Evaluar el piloto en uso real** — *pendiente, es el paso que sigue*. Con esa
+   experiencia se decide si conviene avanzar con la administración del catálogo o
+   con el resto de los procedimientos.
+
+**En pausa hasta evaluar el piloto** (desarrollado o decidido, pero fuera de
+prioridad; nada se descarta):
+
+- Los otros 9 procedimientos del manual. El catálogo completo sigue cargado.
+- La administración del catálogo desde la aplicación.
+- La pantalla de empresa activa para asesores multi-empresa.
+- La decisión del catálogo semilla para Xeitosiño y Pesantar.
+- `signature_requirement` según criterio de PNA: mientras la firma digital no esté
+  habilitada, el respaldo válido es el papel firmado y la pregunta no aplica.
+- Relevar el manual de Xeitosiño / Pesantar y validar el modelo contra un segundo
+  caso real.
 
 ## 7. Diferencias entre este documento y el esquema implementado
 

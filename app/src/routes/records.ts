@@ -1,5 +1,7 @@
-import { Router } from 'express';
+import { Router, raw } from 'express';
 import { withTenant, type Tx } from '../db.js';
+import { config } from '../config.js';
+import * as storage from '../storage.js';
 import { requireAuth, verifySecret, type SessionUser } from '../auth.js';
 import { HttpError, wrap } from '../errors.js';
 
@@ -10,12 +12,23 @@ const user = (req: { user?: SessionUser }): SessionUser => req.user!;
 
 async function loadInstance(tx: Tx, id: string) {
   const { rows } = await tx.query(
-    `SELECT ri.*, rtc.record_code, rtc.record_name, rtc.procedure_code, rtc.scope,
-            rtc.signature_requirement, rtc.allowed_reviewer_roles, rtv.field_schema,
-            v.name AS vessel_name, cu.full_name AS created_by_name
+    // Se traen también los datos del encabezado del MGS (empresa, revisión del
+    // manual, versión del formulario) porque la vista de impresión tiene que
+    // reproducir el formulario en papel, no solo los datos cargados.
+    `SELECT ri.*, rtc.record_code, rtc.record_name, rtc.procedure_code,
+            rtc.procedure_name, rtc.scope, rtc.signature_requirement,
+            rtc.allowed_reviewer_roles, rtv.field_schema, rtv.version AS form_version,
+            rtv.requires_signed_attachment,
+            v.name AS vessel_name, v.matricula, cu.full_name AS created_by_name,
+            c.name AS company_name, mv.revision_number AS manual_revision,
+            mv.regulation_reference, mv.effective_date AS manual_effective_date
        FROM record_instances ri
        JOIN v_record_type_current rtc ON rtc.record_type_id = ri.record_type_id
        JOIN record_type_versions rtv  ON rtv.id = ri.record_type_version_id
+       JOIN record_types rt ON rt.id = ri.record_type_id
+       JOIN procedures p ON p.id = rt.procedure_id
+       JOIN manual_versions mv ON mv.id = p.manual_version_id
+       JOIN companies c ON c.id = ri.company_id
        JOIN users cu ON cu.id = ri.created_by
        LEFT JOIN vessels v ON v.id = ri.vessel_id
       WHERE ri.id = $1`,
@@ -69,6 +82,19 @@ recordsRouter.get('/records/:id', wrap(async (req, res) => {
         WHERE s.record_instance_id = $1 ORDER BY s.signed_at`,
       [req.params.id],
     );
+    const { rows: attachments } = await tx.query(
+      `SELECT a.id, a.kind, a.file_name, a.mime_type, a.byte_size, a.uploaded_at,
+              a.checksum_sha256, u.full_name AS uploaded_by_name,
+              (a.storage_key IS NOT NULL) AS descargable
+         FROM attachments a LEFT JOIN users u ON u.id = a.uploaded_by
+        WHERE a.record_instance_id = $1 ORDER BY a.uploaded_at`,
+      [req.params.id],
+    );
+    const { rows: backing } = await tx.query(
+      `SELECT requires_signed_attachment, signed_attachments, backing_status
+         FROM v_record_backing WHERE record_instance_id = $1`,
+      [req.params.id],
+    );
     const { rows: children } = await tx.query(
       `SELECT ri.id, rtc.record_code, ri.status
          FROM record_instances ri
@@ -76,7 +102,7 @@ recordsRouter.get('/records/:id', wrap(async (req, res) => {
         WHERE ri.parent_record_instance_id = $1`,
       [req.params.id],
     );
-    return { instance, reviews, signatures, children };
+    return { instance, reviews, signatures, children, attachments, backing: backing[0] };
   });
   if (!data) throw new HttpError(404, 'Registro inexistente');
 
@@ -88,7 +114,16 @@ recordsRouter.get('/records/:id', wrap(async (req, res) => {
     code: i.record_code,
     name: i.record_name,
     procedureCode: i.procedure_code,
+    procedureName: i.procedure_name,
+    formVersion: i.form_version,
     scope: i.scope,
+    // Encabezado del formulario impreso
+    companyName: i.company_name,
+    manualRevision: i.manual_revision,
+    regulationReference: i.regulation_reference,
+    manualEffectiveDate: i.manual_effective_date,
+    matricula: i.matricula,
+    singladura: i.singladura,
     signatureRequirement: i.signature_requirement,
     fieldSchema: i.field_schema,
     vesselId: i.vessel_id,
@@ -106,6 +141,11 @@ recordsRouter.get('/records/:id', wrap(async (req, res) => {
     reviews: data.reviews,
     signatures: data.signatures,
     children: data.children,
+    attachments: data.attachments,
+    // Mientras PNA no habilite la firma digital, el respaldo válido es el papel
+    // firmado: la interfaz necesita saber si falta antes de ofrecer aprobar.
+    requiresSignedAttachment: data.backing?.requires_signed_attachment ?? false,
+    backingStatus: data.backing?.backing_status ?? 'no_requiere',
   });
 }));
 
@@ -251,4 +291,104 @@ recordsRouter.post('/records/:id/signatures', wrap(async (req, res) => {
     return rows[0];
   });
   res.status(201).json(signature);
+}));
+
+
+// ---------------------------------------------------------------------------
+// Adjuntos: el formulario en papel firmado a mano
+// ---------------------------------------------------------------------------
+// Mientras PNA no habilite la firma digital, este archivo —no los datos del
+// formulario ni la firma en pantalla— es la evidencia válida del registro.
+//
+// El cuerpo llega como binario crudo (sin multipart) para no sumar una
+// dependencia: el navegador manda el File tal cual y el nombre va por query.
+
+recordsRouter.post(
+  '/records/:id/attachments',
+  raw({ type: storage.tiposAceptados, limit: config.maxAttachmentBytes }),
+  wrap(async (req, res) => {
+    const u = user(req);
+    const mimeType = (req.header('content-type') ?? '').split(';')[0]!.trim();
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      storage.validarTipo(mimeType); // da el mensaje preciso si el tipo es el problema
+      throw new HttpError(400, 'No llegó el contenido del archivo.');
+    }
+    const kind = String(req.query.kind ?? 'formulario_firmado');
+    const fileName = String(req.query.fileName ?? `adjunto.${mimeType.split('/')[1]}`);
+
+    const archivo = await storage.guardar(req.body, mimeType);
+    try {
+      const fila = await withTenant(u.companyId, u.id, async (tx) => {
+        const { rows } = await tx.query(
+          `INSERT INTO attachments (company_id, record_instance_id, storage_key, file_name,
+                                    file_type, mime_type, byte_size, checksum_sha256,
+                                    kind, uploaded_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+           RETURNING id, kind, file_name, byte_size, uploaded_at, checksum_sha256`,
+          [u.companyId, req.params.id, archivo.storageKey, fileName, archivo.fileType,
+           archivo.mimeType, archivo.byteSize, archivo.checksum, kind, u.id],
+        );
+        return rows[0];
+      });
+      res.status(201).json(fila);
+    } catch (err) {
+      // Si la base rechaza la fila (registro aprobado, registro de otra empresa),
+      // el archivo en disco quedaría huérfano.
+      await storage.borrar(archivo.storageKey).catch(() => undefined);
+      throw err;
+    }
+  }),
+);
+
+recordsRouter.get('/records/:id/attachments', wrap(async (req, res) => {
+  const u = user(req);
+  const rows = await withTenant(u.companyId, u.id, async (tx) => {
+    const { rows } = await tx.query(
+      `SELECT a.id, a.kind, a.file_name, a.mime_type, a.byte_size, a.uploaded_at,
+              a.checksum_sha256, u.full_name AS uploaded_by_name,
+              (a.storage_key IS NOT NULL) AS descargable
+         FROM attachments a LEFT JOIN users u ON u.id = a.uploaded_by
+        WHERE a.record_instance_id = $1 ORDER BY a.uploaded_at`,
+      [req.params.id],
+    );
+    return rows;
+  });
+  res.json({ attachments: rows });
+}));
+
+recordsRouter.get('/attachments/:id', wrap(async (req, res) => {
+  const u = user(req);
+  // La consulta no filtra por empresa: RLS ya impide ver el adjunto de otra.
+  const fila = await withTenant(u.companyId, u.id, async (tx) => {
+    const { rows } = await tx.query(
+      `SELECT storage_key, file_name, mime_type, file_type FROM attachments WHERE id = $1`,
+      [req.params.id],
+    );
+    return rows[0];
+  });
+  if (!fila) throw new HttpError(404, 'Adjunto inexistente');
+  if (!fila.storage_key) {
+    throw new HttpError(404, 'Este adjunto es de demostración y no tiene archivo asociado');
+  }
+
+  const contenido = await storage.leer(fila.storage_key);
+  res.setHeader('content-type', fila.mime_type ?? 'application/octet-stream');
+  res.setHeader('content-disposition',
+    `inline; filename="${(fila.file_name ?? 'adjunto').replace(/"/g, '')}"`);
+  res.send(contenido);
+}));
+
+recordsRouter.delete('/attachments/:id', wrap(async (req, res) => {
+  const u = user(req);
+  // El trigger de la base rechaza borrar adjuntos de un registro aprobado.
+  const fila = await withTenant(u.companyId, u.id, async (tx) => {
+    const { rows } = await tx.query(
+      `DELETE FROM attachments WHERE id = $1 RETURNING storage_key`,
+      [req.params.id],
+    );
+    return rows[0];
+  });
+  if (!fila) throw new HttpError(404, 'Adjunto inexistente');
+  if (fila.storage_key) await storage.borrar(fila.storage_key).catch(() => undefined);
+  res.status(204).end();
 }));

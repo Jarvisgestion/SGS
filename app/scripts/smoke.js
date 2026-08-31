@@ -54,13 +54,19 @@ check(true, 'login de capitán, PD y guardia');
 console.log('\n--- Catálogo ---');
 const cat = await call(capitan, 'GET', '/catalog');
 const tipos = cat.data.procedures.flatMap((p) => p.recordTypes);
-check(tipos.length === 44, `el catálogo trae los 44 tipos de registro (${tipos.length})`);
+check(cat.data.pilotProcedures?.join(',') === 'PE-01', 'la API declara que el piloto es PE-01');
+check(tipos.length === 7, `el catálogo ofrece solo los 7 registros de PE-01 (${tipos.length})`);
+check(tipos.every((t) => t.fieldCount > 0), 'los 7 registros de PE-01 tienen sus campos cargados');
+
+const re01a = tipos.find((t) => t.code === 'RE-01A');
+check(re01a?.requiresSignedAttachment === true, 'RE-01A exige el PDF del formulario firmado');
+check(tipos.filter((t) => t.requiresSignedAttachment).length === 1,
+  'es el único de PE-01 que lo exige: el resto se completa e imprime');
 
 const re01d = tipos.find((t) => t.code === 'RE-01D');
 check(re01d?.canCreate === true, 'el capitán puede crear un RE-01D');
-// RMGS-01 (Políticas de la Empresa) solo lo emite el apoderado.
-const rmgs01 = tipos.find((t) => t.code === 'RMGS-01');
-check(rmgs01?.canCreate === false, 'el capitán NO figura habilitado para el RMGS-01 del apoderado');
+check(!tipos.some((t) => t.code === 'RMGS-01'),
+  'los procedimientos fuera del piloto no se ofrecen para carga');
 
 const schema = await call(capitan, 'GET', `/catalog/${re01d.id}`);
 check(Array.isArray(schema.data.fieldSchema) && schema.data.fieldSchema.length === 10,
@@ -168,21 +174,94 @@ check(detalle.data.signatures.length === 1, 'queda la firma asociada al registro
 check(detalle.data.reviews[0].comment?.includes('meteorológicas'),
   'la observación conserva el motivo escrito');
 
-console.log('\n--- Registros enlazados ---');
-const ro07a = tipos.find((t) => t.code === 'RO-07A');
+console.log('\n--- Registros enlazados dentro del piloto ---');
+const re01r = tipos.find((t) => t.code === 'RE-01R');
 const hijo = await call(capitan, 'POST', '/records', {
-  recordTypeId: ro07a.id, vesselId: vessel.id, parentId: id,
-  data: { fecha_hecho: new Date().toISOString(), descripcion: 'Quemadura leve durante la extinción' },
+  recordTypeId: re01r.id, vesselId: vessel.id, parentId: id,
+  data: { motivo: 'Sin propulsión tras el incendio', rol: 'Remolcado',
+          otro_buque_nombre: 'Remolcador Austral' },
 });
-check(hijo.status === 201, 'se crea el RO-07A enlazado al incendio');
+check(hijo.status === 201, 'se crea el RE-01R enlazado al incendio');
 const conHijo = await call(capitan, 'GET', `/records/${id}`);
-check(conHijo.data.children.some((c) => c.record_code === 'RO-07A'),
+check(conHijo.data.children.some((c) => c.record_code === 'RE-01R'),
   'el registro padre muestra el registro que disparó');
+
+console.log('\n--- Zafarrancho: el circuito con respaldo en papel ---');
+const zafa = await call(capitan, 'POST', '/records', {
+  recordTypeId: re01a.id, vesselId: vessel.id, marea: 'M-201',
+  data: {
+    tipo_ejercicio: 'Abandono',
+    tema_tratado: 'Zafarrancho de abandono con arriado de balsa',
+    duracion_min: 40,
+    asistentes: [{ nombre: 'Luis Ocampo', dni: '20333444', puesto: 'Capitán' }],
+  },
+  submit: true,
+});
+check(zafa.status === 201, 'el capitán carga y envía el zafarrancho', JSON.stringify(zafa.data));
+const zafaId = zafa.data.id;
+
+const sinPapel = await call(pd, 'POST', `/records/${zafaId}/review`, { decision: 'aprobado' });
+check(sinPapel.status === 422 && /papel/i.test(sinPapel.data?.error ?? ''),
+  'no se puede aprobar el zafarrancho sin el formulario en papel firmado',
+  JSON.stringify(sinPapel.data));
+
+const detalleSinPapel = await call(pd, 'GET', `/records/${zafaId}`);
+check(detalleSinPapel.data.backingStatus === 'falta_respaldo',
+  'el registro informa que le falta el respaldo');
+
+// Un PDF mínimo pero real, para ejercitar la subida de verdad.
+const pdf = Buffer.from(
+  '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n' +
+  '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' +
+  '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]>>endobj\n' +
+  'trailer<</Root 1 0 R>>\n%%EOF\n', 'latin1');
+
+const subirMal = await fetch(
+  `${BASE}/api/records/${zafaId}/attachments?fileName=nota.txt&kind=formulario_firmado`,
+  { method: 'POST', headers: { 'content-type': 'text/plain', authorization: `Bearer ${capitan}` },
+    body: 'no es un PDF' });
+check(subirMal.status === 415, 'un archivo de texto se rechaza (415)');
+
+const subida = await fetch(
+  `${BASE}/api/records/${zafaId}/attachments?fileName=RE-01A%20firmado.pdf&kind=formulario_firmado`,
+  { method: 'POST', headers: { 'content-type': 'application/pdf', authorization: `Bearer ${capitan}` },
+    body: pdf });
+const subidaBody = await subida.json().catch(() => null);
+check(subida.status === 201, 'se sube el PDF del formulario firmado', JSON.stringify(subidaBody));
+check(/^[0-9a-f]{64}$/.test(subidaBody?.checksum_sha256 ?? ''),
+  'queda registrado el SHA-256 del archivo');
+
+const descarga = await fetch(`${BASE}/api/attachments/${subidaBody.id}`,
+  { headers: { authorization: `Bearer ${pd}` } });
+const bytes = Buffer.from(await descarga.arrayBuffer());
+check(descarga.status === 200 && bytes.equals(pdf),
+  'el PD descarga exactamente el mismo archivo que subió el buque');
+
+const sinSesion = await fetch(`${BASE}/api/attachments/${subidaBody.id}`);
+check(sinSesion.status === 401, 'sin sesión no se descarga el adjunto');
+
+const conPapel = await call(pd, 'POST', `/records/${zafaId}/review`, { decision: 'aprobado' });
+check(conPapel.data?.status === 'aprobado', 'con el PDF adjunto, el PD aprueba el zafarrancho',
+  JSON.stringify(conPapel.data));
+
+const borrarTrasAprobar = await call(capitan, 'DELETE', `/attachments/${subidaBody.id}`);
+check(borrarTrasAprobar.status === 422,
+  'ya aprobado, el respaldo no se puede quitar');
+
+console.log('\n--- Impresión ---');
+const paraImprimir = await call(pd, 'GET', `/records/${zafaId}`);
+check(!!paraImprimir.data.companyName && !!paraImprimir.data.manualRevision
+      && !!paraImprimir.data.formVersion,
+  'el registro trae el encabezado del MGS para poder imprimirlo');
+check(Array.isArray(paraImprimir.data.fieldSchema) && paraImprimir.data.fieldSchema.length > 0,
+  'y trae el formulario con el que se completó, no solo los datos');
 
 console.log('\n--- Reportes ---');
 const compliance = await call(pd, 'GET', '/reports/compliance');
-check(compliance.data.rows.some((r) => r.record_code === 'RE-01A' && r.compliance_status === 'vencido'),
-  'el reporte de cumplimiento marca el zafarrancho vencido');
+check(compliance.data.rows.every((r) => r.procedure_code === 'PE-01'),
+  'el reporte de cumplimiento queda acotado al piloto');
+check(compliance.data.rows.some((r) => r.record_code === 'RE-01A'),
+  'el zafarrancho figura en el control de cumplimiento');
 const certs = await call(pd, 'GET', '/reports/certificates');
 check(certs.data.rows.some((r) => r.status === 'vencido') && certs.data.rows.some((r) => r.status === 'por_vencer'),
   'el reporte de certificados distingue vencido y por vencer');
