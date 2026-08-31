@@ -6,8 +6,15 @@
  *
  * Uso: DATABASE_URL=... node dist/scripts/seed-credenciales.js
  */
-import { pool } from '../db.js';
+import pg from 'pg';
+import { config } from '../config.js';
 import { hashSecret } from '../auth.js';
+
+// Va con la credencial del dueño, no con la de la aplicación: `users` está bajo
+// Row Level Security y sin contexto de empresa el UPDATE no alcanzaría ninguna
+// fila — y lo haría en silencio, sin error.
+const pool = new pg.Client({ connectionString: config.adminDatabaseUrl });
+await pool.connect();
 
 const DEMO = [
   { email: 'pd@demo.local',      password: 'demo1234', pin: '1234' },
