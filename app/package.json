@@ -1,0 +1,28 @@
+{
+  "name": "sgs-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prototipo de la plataforma SGS: API + cliente de referencia",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "dev": "tsc -p tsconfig.json && node --watch dist/server.js",
+    "seed:credenciales": "node dist/scripts/seed-credenciales.js",
+    "smoke": "node scripts/smoke.js",
+    "ui-check": "node scripts/ui-check.mjs"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.7.2"
+  }
+}

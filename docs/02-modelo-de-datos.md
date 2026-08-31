@@ -414,12 +414,16 @@ reformateados: no conviene bloquear el desarrollo esperándolos.
 1. **Esquema SQL y migraciones** — *hecho*. Ver `db/` y `docs/03-esquema-sql.md`.
    PostgreSQL, SQL plano sin ORM, con semilla del catálogo de referencia (44 tipos
    de registro) y pruebas que verifican que el motor hace cumplir las reglas.
-2. **Prototipo de aplicación** — pendiente. Login, carga de un formulario dinámico
-   a partir de `field_schema`, y el flujo borrador → revisión → aprobado.
-   Falta definir el stack (Node/TypeScript o Python); el esquema no lo condiciona.
-3. **Refinar la definición funcional** — pendiente. Catálogo semilla (¿Xeitosiño y
-   Pesantar arrancan de cero o clonan el catálogo de referencia para editarlo?),
-   permisos finos por rol, y pantallas.
+2. **Prototipo de aplicación** — *hecho*. Ver `app/` y `docs/04-prototipo.md`.
+   API en Node/TypeScript y un cliente de referencia que arma cualquier formulario
+   a partir de su `field_schema`, con el flujo completo borrador → revisión →
+   aprobado, firma por PIN o manuscrita, y borradores locales con reenvío
+   idempotente. El frontend definitivo (React u otro) puede reemplazar al cliente
+   de referencia sin tocar la API.
+3. **Refinar la definición funcional** — pendiente, y ahora es el cuello de botella.
+   Catálogo semilla (¿Xeitosiño y Pesantar arrancan de cero o clonan el catálogo de
+   referencia para editarlo?), pantalla de administración del catálogo, y los 30
+   formularios que todavía no tienen campos relevados.
 4. **Definir `signature_requirement` por tipo de registro** — pendiente de
    confirmación de PNA sobre qué evidencia electrónica acepta. El esquema ya
    soporta manuscrita, PIN, ambas o configurable por firmante; falta el criterio.

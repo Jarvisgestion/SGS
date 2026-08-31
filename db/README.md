@@ -39,11 +39,18 @@ db/
 | `0005_risk_attachments_audit` | `attachments`, `risk_assessments`, `audit_log` |
 | `0006_views` | Vistas de cumplimiento, vencimientos, bandeja de revisión y trazabilidad |
 | `0007_rls` | Aislamiento multi-empresa por Row Level Security + rol `sgs_app` |
+| `0008_auth_functions` | Funciones de login (`SECURITY DEFINER`): el único paso que atraviesa RLS, porque autenticar es previo a saber la empresa |
 
 ## Cómo se conecta la aplicación
 
 La app **no** debe conectarse como dueño de las tablas (el dueño saltea RLS). Se
-conecta con el rol `sgs_app` y al inicio de cada request fija el contexto:
+conecta con un rol miembro de `sgs_app`, que crea `db/scripts/create-app-role.sh`:
+
+```bash
+DATABASE_URL="<url del dueño>" db/scripts/create-app-role.sh   # crea sgs_web
+```
+
+Al inicio de cada request fija el contexto:
 
 ```sql
 SET LOCAL sgs.current_company_id = '<uuid de la empresa>';
