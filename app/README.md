@@ -40,7 +40,7 @@ Contraseña de todos: `demo1234`.
 ## Pruebas
 
 ```bash
-npm run smoke      # 47 comprobaciones sobre la API, con el servidor corriendo
+npm run smoke      # 52 comprobaciones sobre la API, con el servidor corriendo
 npm run ui-check   # recorre la interfaz con un navegador real (requiere playwright)
 ```
 
@@ -62,6 +62,7 @@ src/
   errors.ts     Traducción de errores de Postgres a códigos HTTP
   routes/       auth · catalog · records · reports
   storage.ts    Almacén de archivos: guarda el formulario firmado y su SHA-256
+  security.ts   Cabeceras, política de contenido y límite de intentos
 public/
   form.js       Renderiza cualquier formulario desde su field_schema
   print.js      Arma el formulario impreso, con el encabezado y el pie del MGS
@@ -136,6 +137,12 @@ desde el navegador (Ctrl+P → guardar como PDF). Generar los PDF en el servidor
 —para envío por correo o exportación en lote— sería un paso aparte que no cambia
 esta vista.
 
+### Despliegue
+
+Hay un `Dockerfile` en la raíz del repositorio. El arranque prepara la base sola
+—migraciones, rol acotado de la aplicación, semilla si está vacía— y es
+idempotente. Ver `docs/06-despliegue-railway.md`.
+
 ## Lo que el prototipo no hace
 
 - **No hace cumplir `signature_requirement`.** Mientras la firma digital no esté
@@ -150,3 +157,8 @@ esta vista.
   que pedía el requisito, pero no un service worker ni una app instalable.
 - **Almacenamiento de archivos en disco local.** Sirve para el piloto; en producción
   va a un almacenamiento de objetos. La interfaz de `src/storage.ts` no cambia.
+- **Sesiones que se puedan revocar.** El token dura 12 horas y vale hasta que
+  vence; no hay forma de cerrar una sola sesión. Si se pierde una tablet a bordo,
+  hoy hay que desactivar al usuario o rotar `SESSION_SECRET`, que cierra todas.
+- **Límite de intentos compartido entre instancias.** El contador vive en memoria:
+  con más de una instancia deja de ser efectivo.

@@ -373,8 +373,11 @@ recordsRouter.get('/attachments/:id', wrap(async (req, res) => {
 
   const contenido = await storage.leer(fila.storage_key);
   res.setHeader('content-type', fila.mime_type ?? 'application/octet-stream');
-  res.setHeader('content-disposition',
-    `inline; filename="${(fila.file_name ?? 'adjunto').replace(/"/g, '')}"`);
+  res.setHeader('x-content-type-options', 'nosniff');
+  // El nombre lo eligió quien subió el archivo: se limpia antes de devolverlo en
+  // una cabecera.
+  const nombre = (fila.file_name ?? 'adjunto').replace(/[^\w .,()\-]/g, '_');
+  res.setHeader('content-disposition', `inline; filename="${nombre}"`);
   res.send(contenido);
 }));
 

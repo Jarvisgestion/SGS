@@ -35,6 +35,7 @@ En el servicio de la aplicación:
 | `ATTACHMENTS_DIR` | `/data/attachments` | Ya viene puesta en el `Dockerfile` |
 | `DEMO_PASSWORD` | opcional | Contraseña de los usuarios de demostración. Si no se define, se genera una al azar y aparece **una sola vez** en el log del primer despliegue. |
 | `SEED_DEMO` | `false`, opcional | Impide cargar los datos de demostración en una base vacía |
+| `FORCE_HTTPS` | `true`, opcional | Redirige http a https. Ver la advertencia de abajo antes de activarla. |
 
 `PORT` la inyecta Railway y la aplicación la respeta; no hay que definirla.
 
@@ -49,6 +50,14 @@ crear el rol `sgs_web`— y después la aplicación se conecta con ese rol acota
 que sí queda sujeto a las políticas. Si `APP_DB_USER` no está definida, la
 aplicación arranca igual pero deja un aviso en el log: sirve para una prueba, no
 para datos reales.
+
+### Sobre `FORCE_HTTPS`
+
+Viene apagada a propósito. Railway ya sirve el dominio público por HTTPS, y su
+chequeo de salud llega por http sin la cabecera de proxy: si la redirección
+estuviera activa, ese chequeo entraría en un bucle y el despliegue quedaría
+marcado como caído. La cabecera HSTS, que sí está siempre, cubre el lado del
+navegador, que es donde importa. `/api/health` queda exento en cualquier caso.
 
 ## 3. Volumen para los adjuntos
 
@@ -84,7 +93,28 @@ buque *"Demo I"*. Para el piloto real hay que dar de alta la empresa y el buque
 verdaderos; se puede hacer con `SEED_DEMO=false` y cargando los datos a mano, o
 adaptando `db/seed/02_demo_operacion.sql`.
 
-## 6. Antes de usarlo con datos reales
+## 6. Qué trae de fábrica en materia de seguridad
+
+- **Aislamiento entre empresas** en el motor de la base, no en el código: la
+  aplicación se conecta con un rol que no es dueño de las tablas, y las políticas
+  no devuelven ninguna fila sin contexto de empresa.
+- **Límite de intentos** de ingreso (10 cada 10 minutos por dirección) y de firma
+  por PIN (20). Es un contador en memoria: alcanza para una sola instancia, que es
+  lo que el piloto necesita. Con más de una instancia hay que moverlo a la base.
+- **Cabeceras**: política de contenido estricta (la aplicación no carga nada de
+  terceros), `nosniff`, sin posibilidad de embeberla en otro sitio, y HSTS.
+- **Contraseñas y PIN** con scrypt y sal por usuario.
+- **Bitácora de auditoría** append-only de cada alta, cambio, firma y revisión.
+
+Lo que todavía **no** tiene, y conviene saberlo:
+
+- **Las sesiones no se pueden revocar.** El token dura 12 horas y vale hasta que
+  vence. Si se pierde una tablet a bordo, hoy la única salida es desactivar al
+  usuario o rotar `SESSION_SECRET`, que cierra todas las sesiones de todos.
+- **No hay segundo factor** ni política de contraseñas.
+- **El límite de intentos no distingue usuarios**, solo direcciones de origen.
+
+## 7. Antes de usarlo con datos reales
 
 - **HTTPS**: Railway lo da por defecto en el dominio que asigna.
 - **Copias de seguridad**: hay que configurarlas en el servicio PostgreSQL. Los
@@ -96,11 +126,15 @@ adaptando `db/seed/02_demo_operacion.sql`.
 - **`SESSION_SECRET` no se rota sin costo**: cambiarla cierra todas las sesiones
   abiertas.
 
-## 7. Lo que no está verificado
+## 8. Lo que está verificado y lo que no
 
-El `Dockerfile` se escribió con cuidado y cada paso se probó por separado fuera
-del contenedor —instalación de dependencias, compilación, arranque de la base
-desde cero, arranque del servidor y las 47 comprobaciones del circuito—, pero **la
-construcción de la imagen en sí no se pudo probar**: el entorno de desarrollo no
-tiene Docker disponible. Si el primer build falla, el log de Railway va a decir en
-qué paso, y se corrige.
+Se reprodujo el `Dockerfile` paso por paso fuera del contenedor: instalación de
+dependencias con `npm ci --omit=dev`, copia del código respetando `.dockerignore`,
+compilación, `npm prune` y arranque del árbol resultante contra una base
+PostgreSQL creada desde cero. Sobre ese árbol —el mismo que va a quedar dentro de
+la imagen— corren las 52 comprobaciones del circuito y los 11 pasos de interfaz.
+
+Lo único que **no** se pudo probar es la construcción de la imagen en sí, porque
+el entorno de desarrollo no tiene Docker. Lo que queda sin verificar es la
+mecánica de capas de Docker, no el contenido. Si el primer build falla, el log de
+Railway va a decir en qué paso, y se corrige.

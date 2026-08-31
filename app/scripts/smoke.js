@@ -256,6 +256,27 @@ check(!!paraImprimir.data.companyName && !!paraImprimir.data.manualRevision
 check(Array.isArray(paraImprimir.data.fieldSchema) && paraImprimir.data.fieldSchema.length > 0,
   'y trae el formulario con el que se completó, no solo los datos');
 
+console.log('\n--- Endurecimiento ---');
+const cab = await fetch(`${BASE}/api/health`);
+check(cab.headers.get('x-content-type-options') === 'nosniff', 'responde con nosniff');
+check(/frame-ancestors 'none'/.test(cab.headers.get('content-security-policy') ?? ''),
+  'la política de contenido impide embeber la aplicación en otro sitio');
+check(cab.headers.get('x-powered-by') === null, 'no anuncia el framework que usa');
+
+const inexistente = await call(capitan, 'GET', '/no-existe');
+check(inexistente.status === 404 && inexistente.data?.error,
+  'una ruta de API inexistente devuelve 404 en JSON, no la portada');
+
+// El límite es de 10 en 10 minutos; los intentos fallidos previos ya consumieron
+// parte de la cuota de esta IP.
+let bloqueado = false;
+for (let i = 0; i < 14 && !bloqueado; i++) {
+  const r = await call(null, 'POST', '/auth/login',
+    { email: 'capitan@demo.local', password: `mal-${i}` });
+  if (r.status === 429) bloqueado = true;
+}
+check(bloqueado, 'tras varios intentos fallidos, el ingreso queda bloqueado un rato (429)');
+
 console.log('\n--- Reportes ---');
 const compliance = await call(pd, 'GET', '/reports/compliance');
 check(compliance.data.rows.every((r) => r.procedure_code === 'PE-01'),

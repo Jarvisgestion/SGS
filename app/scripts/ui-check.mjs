@@ -100,6 +100,18 @@ await step('adjuntar el PDF del formulario firmado', async () => {
 await page.waitForTimeout(400);
 await page.screenshot({ path: `${OUT}/04-con-respaldo.png`, fullPage: true });
 
+await step('el adjunto se puede recuperar desde la página', async () => {
+  // Comprueba de paso que la política de contenido no bloquee las llamadas
+  // propias de la aplicación (connect-src).
+  if (!(await page.locator('.adjunto').count())) throw new Error('no hay adjuntos listados');
+  const r = await page.evaluate(async () => {
+    const token = localStorage.getItem('sgs.token');
+    const res = await fetch('/api/records', { headers: { authorization: `Bearer ${token}` } });
+    return { ok: res.ok, status: res.status };
+  });
+  if (!r.ok) throw new Error(`la aplicación no pudo consultar su propia API: ${JSON.stringify(r)}`);
+});
+
 await step('el formulario se puede imprimir', async () => {
   await page.getByRole('button', { name: 'Imprimir formulario' }).click();
   await page.locator('.hoja').waitFor({ timeout: 5000 });
