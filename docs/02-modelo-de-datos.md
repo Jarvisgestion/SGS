@@ -405,21 +405,42 @@ sin necesidad de un modo offline complejo.
   (`record_types.version`, y una tabla `procedure_revisions` opcional si se quiere
   guardar el texto de cada cambio), no como un registro operativo más.
 
-## 6. Próximos pasos sugeridos
+## 6. Próximos pasos
 
-1. **Validar este modelo con un segundo caso real** (Xeitosiño o Pesantar) apenas
-   se pueda relevar su manual actual — el objetivo es confirmar que el modelo
-   aguanta un catálogo de registros distinto en cantidad y forma al de Chiarmar,
-   no que se le agreguen campos "a medida" de Chiarmar.
-2. **Definir el catálogo semilla (`seed`)**: decidir si Xeitosiño/Pesantar arrancan
-   desde cero definiendo su propio catálogo en la plataforma, o si se les
-   pre-carga una copia del catálogo de Chiarmar como punto de partida para editar
-   (más rápido, pero hay que dejar claro que es un punto de partida, no el
-   contenido final).
-3. **Definir `signature_requirement` por tipo de registro** una vez haya
-   confirmación de PNA sobre qué evidencia electrónica aceptan — el modelo ya
-   soporta la configuración por `record_type`, falta el criterio de negocio.
-4. **Elegir motor de persistencia concreto** (Postgres con JSONB es la opción más
-   directa dado que casi todo acá es JSON Schema + relaciones; también serviría
-   un documental si se prefiere) y traducir este documento a migraciones/schema
-   real.
+Orden acordado con el cliente. El paso 5 (relevar el manual real) va al final
+porque los manuales de Xeitosiño y Pesantar están desactualizados y van a ser
+reformateados: no conviene bloquear el desarrollo esperándolos.
+
+1. **Esquema SQL y migraciones** — *hecho*. Ver `db/` y `docs/03-esquema-sql.md`.
+   PostgreSQL, SQL plano sin ORM, con semilla del catálogo de referencia (44 tipos
+   de registro) y pruebas que verifican que el motor hace cumplir las reglas.
+2. **Prototipo de aplicación** — pendiente. Login, carga de un formulario dinámico
+   a partir de `field_schema`, y el flujo borrador → revisión → aprobado.
+   Falta definir el stack (Node/TypeScript o Python); el esquema no lo condiciona.
+3. **Refinar la definición funcional** — pendiente. Catálogo semilla (¿Xeitosiño y
+   Pesantar arrancan de cero o clonan el catálogo de referencia para editarlo?),
+   permisos finos por rol, y pantallas.
+4. **Definir `signature_requirement` por tipo de registro** — pendiente de
+   confirmación de PNA sobre qué evidencia electrónica acepta. El esquema ya
+   soporta manuscrita, PIN, ambas o configurable por firmante; falta el criterio.
+5. **Cargar el manual de Xeitosiño / Pesantar y validar el modelo** — pendiente.
+   Es la prueba de fuego: confirmar que el esquema aguanta un catálogo distinto en
+   cantidad, códigos y campos, sin agregarle nada "a medida" de Chiarmar.
+
+## 7. Diferencias entre este documento y el esquema implementado
+
+El esquema de `db/` se apartó de este documento en cuatro puntos, todos por razones
+que aparecieron al escribir el SQL. Están detallados en `docs/03-esquema-sql.md`:
+
+1. `field_schema`, recurrencia, firmas y roles habilitados se movieron de
+   `record_types` a una tabla `record_type_versions`. Sin eso, editar un formulario
+   reescribía el histórico ya firmado, que es justamente lo que el principio de
+   diseño #3 promete evitar.
+2. `vessel_certificates.status` y `record_instances.status` derivado: el estado de
+   vencimiento de un certificado no se almacena, se calcula en una vista. Un estado
+   guardado queda obsoleto solo con que pase el tiempo.
+3. `record_types.scope` admite un tercer valor, `vessel_optional`: hay registros
+   (no conformidad, capacitación, análisis de riesgo) que pueden ser de la empresa
+   o de un buque, y el par company/vessel no los cubría.
+4. Se agregó `record_instances.client_uuid` para que reenviar un registro tras un
+   corte de señal no lo duplique.
