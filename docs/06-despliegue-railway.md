@@ -35,6 +35,7 @@ En el servicio de la aplicación:
 | `ATTACHMENTS_DIR` | `/data/attachments` | Ya viene puesta en el `Dockerfile` |
 | `DEMO_PASSWORD` | opcional | Contraseña de los usuarios de demostración. Si no se define, se genera una al azar y aparece **una sola vez** en el log del primer despliegue. |
 | `SEED_DEMO` | `false`, opcional | Impide cargar los datos de demostración en una base vacía |
+| `RESET_DEMO_PASSWORD` | opcional, temporal | Reasigna la contraseña de las cuentas `@demo.local` sobre una base que ya tiene datos. Ver abajo. |
 | `FORCE_HTTPS` | `true`, opcional | Redirige http a https. Ver la advertencia de abajo antes de activarla. |
 
 `PORT` la inyecta Railway y la aplicación la respeta; no hay que definirla.
@@ -50,6 +51,30 @@ crear el rol `sgs_web`— y después la aplicación se conecta con ese rol acota
 que sí queda sujeto a las políticas. Si `APP_DB_USER` no está definida, la
 aplicación arranca igual pero deja un aviso en el log: sirve para una prueba, no
 para datos reales.
+
+### Recuperar el acceso cuando la base ya tiene datos
+
+La semilla y su contraseña solo se generan si la base está **vacía**. Si un
+despliegue anterior ya la cargó, el arranque no la toca —correcto: no debe pisar
+datos— y la contraseña de aquel momento quedó en el log de aquel despliegue.
+
+Para asignar una nueva sin perder nada:
+
+1. Agregar la variable `RESET_DEMO_PASSWORD` con la contraseña deseada.
+2. Redesplegar. El log confirma qué cuentas se actualizaron.
+3. **Quitar la variable** y volver a desplegar.
+
+Solo reescribe la contraseña y el PIN de las cuatro cuentas `@demo.local`. No
+toca registros, adjuntos, revisiones ni ningún otro usuario. Está acotada a esas
+cuentas a propósito: así no puede usarse para apropiarse de la cuenta de una
+persona real.
+
+El tercer paso importa. Mientras la variable esté puesta, la contraseña se
+reescribe en cada despliegue —con lo cual no se puede cambiar desde ningún otro
+lado— y queda a la vista de cualquiera que abra la configuración del servicio.
+
+Si el log dice que no encontró ninguna cuenta `@demo.local`, la base tiene datos
+de otra procedencia y conviene revisar qué usuarios hay cargados antes de seguir.
 
 ### Sobre `FORCE_HTTPS`
 

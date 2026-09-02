@@ -114,7 +114,55 @@ if (Number(conteo.rows[0]?.count ?? 0) > 0) {
   log('----------------------------------------------------------');
 }
 
-// --- 4. Directorio de adjuntos -------------------------------------------
+// --- 4. Reasignar credenciales de demostración ---------------------------
+// Sirve cuando la base ya tiene datos y la contraseña generada en un despliegue
+// anterior se perdió. No borra ni modifica ningún registro: solo reescribe el
+// hash de la contraseña y el PIN de los cuatro usuarios de demostración.
+//
+// Alcanza únicamente a las cuentas @demo.local. Es a propósito: así esta variable
+// no puede usarse para apropiarse de la cuenta de una persona real.
+const CUENTAS_DEMO: Record<string, string> = {
+  'pd@demo.local': '1234', 'capitan@demo.local': '2345',
+  'jm@demo.local': '3456', 'guardia@demo.local': '4567',
+};
+
+const nuevaClave = process.env.RESET_DEMO_PASSWORD;
+if (nuevaClave) {
+  const actualizados: string[] = [];
+  for (const [email, pin] of Object.entries(CUENTAS_DEMO)) {
+    const res = await admin.query<{ full_name: string }>(
+      `UPDATE users SET password_hash = $2, pin_hash = $3, status = 'activo'
+        WHERE lower(email) = lower($1) RETURNING full_name`,
+      [email, hashSecret(nuevaClave), hashSecret(pin)],
+    );
+    if (res.rows[0]) actualizados.push(`${email} (${res.rows[0].full_name})`);
+  }
+
+  log('----------------------------------------------------------');
+  if (actualizados.length === 0) {
+    log('RESET_DEMO_PASSWORD está definida pero no existe ninguna cuenta @demo.local.');
+    log('La base tiene datos de otra procedencia: revisá qué usuarios hay cargados.');
+  } else {
+    log(`contraseña reasignada a ${actualizados.length} cuenta(s) de demostración:`);
+    for (const a of actualizados) log(`  ${a}`);
+    log('PIN: PD 1234 · Capitán 2345 · Jefe de Máquinas 3456 · Guardia 4567');
+    log('QUITÁ la variable RESET_DEMO_PASSWORD: mientras esté, la contraseña se');
+    log('reescribe en cada despliegue y queda a la vista de quien lea la configuración.');
+  }
+  log('----------------------------------------------------------');
+} else {
+  // Diagnóstico: una cuenta sin contraseña no puede entrar, y desde afuera se ve
+  // igual que una contraseña equivocada.
+  const sinClave = await admin.query<{ email: string }>(
+    `SELECT email FROM users
+      WHERE password_hash IS NULL AND lower(email) LIKE '%@demo.local'`);
+  if (sinClave.rows.length > 0) {
+    log(`cuentas de demostración sin contraseña: ${sinClave.rows.map((r) => r.email).join(', ')}`);
+    log('Definí RESET_DEMO_PASSWORD para asignarles una sin tocar el resto de los datos.');
+  }
+}
+
+// --- 5. Directorio de adjuntos -------------------------------------------
 fs.mkdirSync(config.attachmentsDir, { recursive: true });
 log(`adjuntos en ${config.attachmentsDir}`);
 
