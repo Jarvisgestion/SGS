@@ -47,8 +47,11 @@ function showError(container, message) {
 // ---------------------------------------------------------------- login
 function renderLogin(message) {
   const form = el('div', { class: 'panel' });
-  const email = el('input', { type: 'email', value: 'capitan@demo.local', autocomplete: 'username' });
-  const pass = el('input', { type: 'password', value: 'demo1234', autocomplete: 'current-password' });
+  // La contraseña no viene precargada: en una instalación desplegada, un valor
+  // por omisión invita a apretar Enter y hace parecer que las credenciales
+  // fallan cuando en realidad se mandó la de otro momento.
+  const email = el('input', { type: 'email', value: '', autocomplete: 'username', placeholder: 'capitan@demo.local' });
+  const pass = el('input', { type: 'password', value: '', autocomplete: 'current-password' });
   const btn = el('button', { class: 'primary', text: 'Ingresar' });
 
   const submit = async () => {
@@ -73,7 +76,7 @@ function renderLogin(message) {
 
   form.append(
     el('h2', { text: 'Sistema de Gestión de Seguridad' }),
-    el('p', { class: 'hint', text: 'Prototipo. Usuarios de demo: capitan@ · pd@ · jm@ · guardia@demo.local — contraseña demo1234' }),
+    el('p', { class: 'hint', text: 'Etapa de prueba — PE-01. Cuentas: capitan@ · pd@ · jm@ · guardia@demo.local' }),
     el('div', { class: 'field' }, [el('label', { text: 'Correo' }), email]),
     el('div', { class: 'field' }, [el('label', { text: 'Contraseña' }), pass]),
     btn,
